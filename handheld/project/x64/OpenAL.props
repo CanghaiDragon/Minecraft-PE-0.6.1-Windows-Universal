@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Portable OpenAL Soft dependency settings.
+
+  The OpenAL source lives under third_party/openal-soft. The established
+  handheld/lib layout contains the active Win32/x86 headers and import library.
+  Add an architecture-specific prebuilt directory before adding another Visual
+  Studio platform configuration.
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="OpenALDependency">
+    <OpenALRoot>$(MSBuildThisFileDirectory)..\..\..\third_party\openal-soft</OpenALRoot>
+    <OpenALPlatformFamily Condition="'$(ApplicationType)' == 'Windows Store'">uwp</OpenALPlatformFamily>
+    <OpenALPlatformFamily Condition="'$(OpenALPlatformFamily)' == ''">win32</OpenALPlatformFamily>
+    <OpenALArchitecture Condition="'$(Platform)' == 'Win32'">x86</OpenALArchitecture>
+    <OpenALArchitecture Condition="'$(Platform)' == 'x64'">x64</OpenALArchitecture>
+    <OpenALArchitecture Condition="'$(Platform)' == 'ARM64'">arm64</OpenALArchitecture>
+    <OpenALArchitecture Condition="'$(Platform)' == 'ARM'">arm32</OpenALArchitecture>
+    <OpenALPrebuiltRoot>$(OpenALRoot)\prebuilt\$(OpenALPlatformFamily)\$(OpenALArchitecture)</OpenALPrebuiltRoot>
+    <OpenALSharedLibRoot>$(MSBuildThisFileDirectory)..\..\lib</OpenALSharedLibRoot>
+    <OpenALIncludeDirectory>$(OpenALSharedLibRoot)\include</OpenALIncludeDirectory>
+    <OpenALLibraryDirectory Condition="'$(OpenALPlatformFamily)' == 'win32' and '$(OpenALArchitecture)' == 'x86'">$(OpenALSharedLibRoot)\lib</OpenALLibraryDirectory>
+    <OpenALLibraryDirectory Condition="'$(OpenALLibraryDirectory)' == ''">$(OpenALPrebuiltRoot)\lib</OpenALLibraryDirectory>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OpenALIncludeDirectory);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OpenALLibraryDirectory);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>OpenAL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <Target Name="VerifyOpenALDependency" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(OpenALArchitecture)' == ''" Text="No OpenAL architecture mapping exists for Platform '$(Platform)'. Add one to OpenAL.props." />
+    <Error Condition="!Exists('$(OpenALIncludeDirectory)\AL\al.h')" Text="OpenAL headers are missing from $(OpenALIncludeDirectory). Restore handheld/lib/include/AL." />
+    <Error Condition="!Exists('$(OpenALLibraryDirectory)\OpenAL32.lib')" Text="OpenAL import library is missing: $(OpenALLibraryDirectory)\OpenAL32.lib. Build OpenAL Soft for $(OpenALPlatformFamily)/$(OpenALArchitecture), then place its import library there." />
+  </Target>
+
+</Project>
