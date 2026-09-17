@@ -10,6 +10,9 @@
 #ifdef STANDALONE_SERVER
 #define NO_EGL
 #endif
+#ifdef WIN32_WGL
+#define NO_EGL
+#endif
 
 #include "AppPlatform.h"
 #ifndef NO_EGL 
@@ -22,6 +25,11 @@ typedef struct AppContext {
 	EGLDisplay display;
 	EGLContext context;
 	EGLSurface surface;
+#endif
+#ifdef WIN32_WGL
+	// Desktop WGL owns its native context in the Win32 platform layer.
+	void* graphicsContext;
+	void (*swapGraphicsBuffers)(void* graphicsContext);
 #endif
 	AppPlatform* platform;
 	bool doRender;
@@ -65,6 +73,9 @@ public:
 #ifndef NO_EGL
 		if (_context.doRender)
 			eglSwapBuffers(_context.display, _context.surface);
+#elif defined(WIN32_WGL)
+		if (_context.doRender && _context.swapGraphicsBuffers)
+			_context.swapGraphicsBuffers(_context.graphicsContext);
 #endif
 	}
 

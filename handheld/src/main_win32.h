@@ -8,7 +8,11 @@
 */
 
 #include "client/renderer/gles.h"
+#if !defined(WIN32_WGL)
 #include <EGL/egl.h>
+#else
+#include "platform/WglContext_win32.h"
+#endif
 #define WIN32_LEAN_AND_MEAN 1
 #include <windows.h>
 #include <windowsx.h>
@@ -52,6 +56,7 @@ static char g_win32PendingNumericChar = 0;
 // not part of the game and steals focus at every launch.  Resolve the private
 // control function dynamically so a future EGL backend (ANGLE, Mesa, UWP,
 // etc.) has no compile- or link-time dependency on PVRVFrame.
+#if !defined(WIN32_WGL)
 static void disableLegacyPvrVFrameControlWindow() {
 	HMODULE eglModule = GetModuleHandleA("libEGL.dll");
 	if (!eglModule) return;
@@ -62,6 +67,7 @@ static void disableLegacyPvrVFrameControlWindow() {
 			GetProcAddress(eglModule, "PVRVFrameEnableControlWindow"));
 	if (setEnabled) setEnabled(false);
 }
+#endif
 
 // Windows can promote a touch contact to WM_LBUTTON* messages.  Filtering
 // only by g_win32TouchActive is racy because the promoted message can arrive
@@ -519,6 +525,40 @@ int main(void) {
 	AppContext appContext;
 	MSG sMessage;
 #ifndef STANDALONE_SERVER
+	HWND hwnd;
+	g_running = true;
+
+	// Window and input initialization are shared by the EGL and WGL variants.
+	appContext.platform = new AppPlatform_win32();
+	platform(&hwnd, appContext.platform->getScreenWidth(), appContext.platform->getScreenHeight());
+	ShowWindow(hwnd, SW_SHOW);
+	SetForegroundWindow(hwnd);
+	SetFocus(hwnd);
+	g_win32Hwnd = hwnd;
+	{
+		RAWINPUTDEVICE rid;
+		rid.usUsagePage = 0x01;
+		rid.usUsage = 0x02;
+		rid.dwFlags = 0;
+		rid.hwndTarget = hwnd;
+		RegisterRawInputDevices(&rid, 1, sizeof(rid));
+	}
+
+#if defined(WIN32_WGL)
+	Win32WglContext wglContext = {};
+	if (!createWin32WglContext(hwnd, &wglContext)) {
+		printf("Unable to create the Win32 WGL compatibility context (error %lu)\n", GetLastError());
+		appContext.platform->finish();
+		delete appContext.platform;
+		return 1;
+	}
+	appContext.graphicsContext = &wglContext;
+	appContext.swapGraphicsBuffers = swapWin32WglBuffers;
+	appContext.doRender = true;
+
+	// The context must be current before GLEW loads desktop GL extensions.
+	glInit();
+#else
 	// Must run before the first EGL call; PVRVFrame otherwise opens its SDK
 	// control panel while it initializes the emulated GLES context.
 	disableLegacyPvrVFrameControlWindow();
@@ -539,26 +579,6 @@ int main(void) {
 
 	EGLConfig m_eglConfig[1];
 	EGLint nConfigs;
-
-	HWND hwnd;
-	g_running = true;
-
-	// Platform init.
-	appContext.platform = new AppPlatform_win32();
-	platform(&hwnd, appContext.platform->getScreenWidth(), appContext.platform->getScreenHeight());
-	ShowWindow(hwnd, SW_SHOW);
-	SetForegroundWindow(hwnd);
-	SetFocus(hwnd);
-	g_win32Hwnd = hwnd;
-	// Register for raw mouse input (enables in-game relative mouse look)
-	{
-		RAWINPUTDEVICE rid;
-		rid.usUsagePage = 0x01;  // HID_USAGE_PAGE_GENERIC
-		rid.usUsage     = 0x02;  // HID_USAGE_GENERIC_MOUSE
-		rid.dwFlags     = 0;
-		rid.hwndTarget  = hwnd;
-		RegisterRawInputDevices(&rid, 1, sizeof(rid));
-	}
 
 	// EGL init.
 	appContext.display = eglGetDisplay(GetDC(hwnd));
@@ -581,7 +601,7 @@ int main(void) {
 	eglMakeCurrent(appContext.display, appContext.surface, appContext.surface, appContext.context);
 	
 	glInit();
-
+#endif // WIN32_WGL
 #endif
 	App* app = new MAIN_CLASS();
 
@@ -615,6 +635,10 @@ int main(void) {
 	Sleep(50);
 	delete app;
 	Sleep(50);
+#if defined(WIN32_WGL)
+	// The window and HDC must still exist while the WGL context is detached.
+	destroyWin32WglContext(&wglContext);
+#endif
 	appContext.platform->finish();
 	Sleep(50);
 	delete appContext.platform;
@@ -622,11 +646,13 @@ int main(void) {
 	//printf("_crtDumpMemoryLeaks: %d\n", _CrtDumpMemoryLeaks());
 	
 #ifndef STANDALONE_SERVER
+	#if !defined(WIN32_WGL)
 	// Exit.
 	eglMakeCurrent(appContext.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 	eglDestroyContext(appContext.display, appContext.context);
 	eglDestroySurface(appContext.display, appContext.surface);
 	eglTerminate(appContext.display);
+	#endif
 #endif
 
 	return 0;

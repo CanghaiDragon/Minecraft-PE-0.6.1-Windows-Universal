@@ -18,8 +18,11 @@
 
 
 #if defined(_WIN32)
-DWORD mProcMask;
-DWORD mSysMask;
+// The Windows affinity APIs use pointer-width masks.  Keeping these as
+// DWORDs worked by accident on 32-bit Windows, but truncates the API's
+// required type on x64 and ARM64.
+DWORD_PTR mProcMask;
+DWORD_PTR mSysMask;
 HANDLE mThread;
 
 
@@ -137,11 +140,7 @@ RakNet::TimeUS GetTimeUS_Windows( void )
 		HANDLE mProc = GetCurrentProcess();
 
 		// Get the current Affinity
-#if _MSC_VER >= 1400 && defined (_M_X64)
-		GetProcessAffinityMask(mProc, (PDWORD_PTR)&mProcMask, (PDWORD_PTR)&mSysMask);
-#else
 		GetProcessAffinityMask(mProc, &mProcMask, &mSysMask);
-#endif
 		mThread = GetCurrentThread();
 
 #endif // _WIN32_WCE
