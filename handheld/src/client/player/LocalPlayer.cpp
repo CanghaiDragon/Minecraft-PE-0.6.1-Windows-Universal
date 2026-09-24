@@ -31,6 +31,28 @@
 #include "../../network/packet/AnimatePacket.h"
 #include "../../world/item/ArmorItem.h"
 #include "../../network/packet/PlayerArmorEquipmentPacket.h"
+#include <cstdio>
+#ifdef WIN32
+#include <windows.h>
+#endif
+
+static bool hasImportedSkin() {
+#ifdef WIN32
+	char executablePath[MAX_PATH] = { 0 };
+	DWORD length = GetModuleFileNameA(NULL, executablePath, MAX_PATH);
+	std::string path(executablePath, length);
+	std::string::size_type slash = path.find_last_of("\\/");
+	if (slash == std::string::npos) return false;
+	path.erase(slash + 1);
+	path += "data/images/skins/local.png";
+	FILE* file = fopen(path.c_str(), "rb");
+#else
+	FILE* file = fopen("data/images/skins/local.png", "rb");
+#endif
+	if (file == NULL) return false;
+	fclose(file);
+	return true;
+}
 
 //@note: doesn't work completely, since it doesn't care about stairs rotation
 static bool isJumpable(int tileId) {
@@ -50,7 +72,10 @@ LocalPlayer::LocalPlayer(Minecraft* minecraft, Level* level, User* user, int dim
 	sentInventoryItemId(-1),
 	sentInventoryItemData(-1),
 	autoJumpEnabled(true),
-	armorTypeHash(0)
+	armorTypeHash(0),
+	sprinting(false),
+	sprintDoubleTapTimer(0),
+	prevForwardHeld(false)
 {
 	this->dimension = dimension;
 	_init();
@@ -59,6 +84,10 @@ LocalPlayer::LocalPlayer(Minecraft* minecraft, Level* level, User* user, int dim
 		if (user->name.length() > 0)
 			//customTextureUrl = "http://s3.amazonaws.com/MinecraftSkins/" + user.name + ".png";
 			this->name = user->name;
+	}
+	// Offline custom skin imported into the portable game folder.
+	if (hasImportedSkin()) {
+		setTextureName("skins/local.png");
 	}
 }
 
@@ -73,6 +102,11 @@ void LocalPlayer::calculateFlight(float xa, float ya, float za) {
     xa = xa * minecraft->options.flySpeed;
     ya = 0;
     za = za * minecraft->options.flySpeed;
+
+	if (sprinting) {
+		xa *= getWalkingSpeedModifier();
+		za *= getWalkingSpeedModifier();
+	}
 
 #ifdef ANDROID
     if (Keyboard::isKeyDown(103)) ya = .2f * minecraft->options.flySpeed;
@@ -177,6 +211,35 @@ void LocalPlayer::aiStep() {
 	if (!screenCovering)
 		input->tick(this);
 
+	// Sprint is a creative-mode convenience only.  Both keyboard W and the
+	// touch D-Pad's forward key feed positive input->ya, so their rising edge
+	// gives the same double-tap behaviour.  Desktop Ctrl is an alternate
+	// hold-to-sprint trigger while moving forward.
+	if (minecraft->isCreativeMode()) {
+		const bool forwardHeld = input->ya > 0;
+		const bool ctrlSprint = !minecraft->useTouchscreen()
+			&& Keyboard::isKeyDown(Keyboard::KEY_LEFT_CTRL);
+		if (forwardHeld && ctrlSprint) {
+			sprinting = true;
+		} else if (forwardHeld && !prevForwardHeld) {
+			if (sprintDoubleTapTimer > 0)
+				sprinting = true;
+			else
+				sprintDoubleTapTimer = 7;
+		}
+		if (!forwardHeld)
+			sprinting = false;
+		if (sprintDoubleTapTimer > 0)
+			sprintDoubleTapTimer--;
+		prevForwardHeld = forwardHeld;
+		if (input->sneaking)
+			sprinting = false;
+	} else {
+		sprinting = false;
+		sprintDoubleTapTimer = 0;
+		prevForwardHeld = false;
+	}
+
     if (input->sneaking) {
         if (ySlideOffset < 0.2f) ySlideOffset = 0.2f;
     }
@@ -250,7 +313,7 @@ void LocalPlayer::move(float xa, float ya, float za) {
 
 		float newX = x, newZ = z;
 
-		if (autoJumpTime <= 0 && autoJumpEnabled)
+		if (autoJumpTime <= 0 && autoJumpEnabled && !isSneaking())
 		{
 			// auto-jump when crossing the middle of a tile, and the tile in the front is blocked
 			bool jump = false;
@@ -295,6 +358,11 @@ void LocalPlayer::setKey( int eventKey, bool eventKeyState )
 void LocalPlayer::releaseAllKeys()
 {
 	if (input) input->releaseAllKeys();
+}
+
+float LocalPlayer::getWalkingSpeedModifier()
+{
+	return sprinting ? 1.3f : 1.0f;
 }
 
 float LocalPlayer::getFieldOfViewModifier() {
@@ -386,6 +454,18 @@ void LocalPlayer::die(Entity* source)
 	super::die(source);
 }
 
+void LocalPlayer::outOfWorld()
+{
+	// Mob::outOfWorld applies the old PE void damage directly on the client.
+	// Unlike Mob::hurt, that path does not call die() when it reaches zero,
+	// so the death screen used to respawn with the inventory untouched.
+	const int oldHealth = health;
+	super::outOfWorld();
+	if (oldHealth > 0 && health <= 0) {
+		die(NULL);
+	}
+}
+
 void LocalPlayer::swing() {
     super::swing();
 
@@ -409,6 +489,9 @@ void LocalPlayer::_init() {
 	descendTriggerTime	= 0;
 	ascending	= false;
 	descending	= false;
+	sprinting	= false;
+	sprintDoubleTapTimer = 0;
+	prevForwardHeld = false;
 
 	ItemInstance* item = inventory->getSelected();
 	sentInventoryItemId = item? item->id : 0;

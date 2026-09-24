@@ -12,6 +12,7 @@
 #include <EGL/egl.h>
 #else
 #include "platform/WglContext_win32.h"
+#include "platform/ExitTrace.h"
 #endif
 #define WIN32_LEAN_AND_MEAN 1
 #include <windows.h>
@@ -39,6 +40,29 @@ bool g_win32TouchInputEnabled = true;
 // again with either a mouse or a finger.
 bool g_win32GuiInputEnabled = true;
 static int g_win32MouseMoveTraceBudget = 0;
+
+// Write a small crash report beside the executable.  This is intentionally
+// self-contained and uses only Windows APIs so it also works on ARM64 test
+// devices without a debugger or extra runtime DLLs.
+static LONG WINAPI mcpeWin32CrashHandler(EXCEPTION_POINTERS* info) {
+	FILE* f = std::fopen("MinecraftWin32-crash.log", "ab");
+	if (f) {
+		std::fprintf(f, "\n--- unhandled exception ---\n");
+		if (info && info->ExceptionRecord) {
+			std::fprintf(f, "code=0x%08lX address=%p flags=%lu\n",
+				(unsigned long)info->ExceptionRecord->ExceptionCode,
+				info->ExceptionRecord->ExceptionAddress,
+				(unsigned long)info->ExceptionRecord->ExceptionFlags);
+		}
+		void* frames[32] = {};
+		USHORT count = CaptureStackBackTrace(0, 32, frames, NULL);
+		for (USHORT i = 0; i < count; ++i)
+			std::fprintf(f, "frame[%u]=%p\n", (unsigned)i, frames[i]);
+		std::fflush(f);
+		std::fclose(f);
+	}
+	return EXCEPTION_CONTINUE_SEARCH;
+}
 
 // True while one or more real touchscreen contacts are active.
 // Used to prevent Windows-promoted mouse messages from contaminating Multitouch.
@@ -162,6 +186,7 @@ static int getBits(int bits, int startBitInclusive, int endBitExclusive, int shi
 // Map Win32 virtual keys to the game's internal key codes.
 static unsigned char transformKey_win32(WPARAM wParam) {
 	if (wParam == VK_LSHIFT || wParam == VK_SHIFT) return Keyboard::KEY_LSHIFT;
+	if (wParam == VK_LCONTROL || wParam == VK_RCONTROL || wParam == VK_CONTROL) return Keyboard::KEY_LEFT_CTRL;
 	if (wParam == VK_TAB) return 250;  // internal Tab code (same as macOS/Linux)
 	return (unsigned char)wParam;
 }
@@ -522,6 +547,8 @@ void inputNetworkThread(void* userdata)
 }
 
 int main(void) {
+	MCPE_EXIT_TRACE("main: begin");
+	SetUnhandledExceptionFilter(mcpeWin32CrashHandler);
 	AppContext appContext;
 	MSG sMessage;
 #ifndef STANDALONE_SERVER
@@ -632,16 +659,25 @@ int main(void) {
 		//Sleep(30);
 	}
 
+	MCPE_EXIT_TRACE("main: loop ended g_running=%d wantToQuit=%d", g_running ? 1 : 0, app->wantToQuit() ? 1 : 0);
 	Sleep(50);
+	MCPE_EXIT_TRACE("main: before delete app");
 	delete app;
+	MCPE_EXIT_TRACE("main: after delete app");
 	Sleep(50);
 #if defined(WIN32_WGL)
 	// The window and HDC must still exist while the WGL context is detached.
+	MCPE_EXIT_TRACE("main: before destroy WGL");
 	destroyWin32WglContext(&wglContext);
+	MCPE_EXIT_TRACE("main: after destroy WGL");
 #endif
+	MCPE_EXIT_TRACE("main: before platform finish");
 	appContext.platform->finish();
+	MCPE_EXIT_TRACE("main: after platform finish");
 	Sleep(50);
+	MCPE_EXIT_TRACE("main: before delete platform");
 	delete appContext.platform;
+	MCPE_EXIT_TRACE("main: after delete platform");
 	Sleep(50);
 	//printf("_crtDumpMemoryLeaks: %d\n", _CrtDumpMemoryLeaks());
 	
@@ -655,6 +691,7 @@ int main(void) {
 	#endif
 #endif
 
+	MCPE_EXIT_TRACE("main: complete");
 	return 0;
 }
 

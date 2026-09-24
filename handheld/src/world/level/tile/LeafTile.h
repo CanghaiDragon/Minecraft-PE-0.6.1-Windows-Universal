@@ -5,6 +5,7 @@
 
 #include "TransparentTile.h"
 #include "../Level.h"
+#include "../biome/BiomeSource.h"
 #include "../material/Material.h"
 #include "../../item/Item.h"
 #include "../../item/ItemInstance.h"
@@ -55,7 +56,12 @@ public:
             return FoliageColor::getBirchColor();
         }
 
-        return FoliageColor::getDefaultColor();
+		if (Tile::useBetaVisuals()) {
+			level->getBiomeSource()->getBiomeBlock(x, z, 1, 1);
+			return FoliageColor::get(level->getBiomeSource()->temperatures[0],
+				level->getBiomeSource()->downfalls[0]);
+		}
+		return FoliageColor::getDefaultColor();
     }
 
     void onRemove(Level* level, int x, int y, int z) {

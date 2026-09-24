@@ -15,11 +15,14 @@
 #include "../../AppConstants.h"
 #include "../../world/entity/player/Inventory.h"
 #include "../../world/level/material/Material.h"
+#include "../../world/level/tile/Tile.h"
 #include "../../world/item/Item.h"
 #include "../../world/item/ItemInstance.h"
 #include "../../platform/input/Mouse.h"
 #include "../../world/level/Level.h"
 #include "../../world/PosTranslator.h"
+#include <cmath>
+#include <cstdio>
 
 float Gui::InvGuiScale = 1.0f / 3.0f;
 float Gui::GuiScale = 1.0f / Gui::InvGuiScale;
@@ -117,9 +120,7 @@ void Gui::render(float a, bool mouseFree, int xMouse, int yMouse) {
 #if !defined(RPI)
 	renderOnSelectItemNameText(screenWidth, font, ySlot);
 #endif
-#if defined(RPI)
 	renderDebugInfo();
-#endif
 
 //        glPopMatrix2();
 //
@@ -671,18 +672,66 @@ void Gui::onLevelGenerated() {
 }
 
 void Gui::renderDebugInfo() {
-	static char buf[256];
-	float xx = minecraft->player->x;
-	float yy = minecraft->player->y - minecraft->player->heightOffset;
-	float zz = minecraft->player->z;
-	posTranslator.to(xx, yy, zz);
-	sprintf(buf, "pos: %3.1f, %3.1f, %3.1f\n", xx, yy, zz);
-	Tesselator& t = Tesselator::instance;
-	t.beginOverride();
-	t.scale2d(InvGuiScale, InvGuiScale);
-	minecraft->font->draw(buf, 2, 2, 0xffffff);
-	t.resetScale();
-	t.endOverrideAndDraw();
+	if (!minecraft->options.renderDebug || !minecraft->player || !minecraft->level)
+		return;
+
+	LocalPlayer* player = minecraft->player;
+	Level* level = minecraft->level;
+	const int bx = (int)std::floor(player->x);
+	const int by = (int)std::floor(player->y - player->heightOffset);
+	const int bz = (int)std::floor(player->z);
+	const int cx = bx >> 4;
+	const int cz = bz >> 4;
+
+	float yaw = std::fmod(player->yRot, 360.0f);
+	if (yaw < 0) yaw += 360.0f;
+	const char* facing;
+	const char* axis;
+	if (yaw < 45 || yaw >= 315) { facing = "South"; axis = "+Z"; }
+	else if (yaw < 135) { facing = "West"; axis = "-X"; }
+	else if (yaw < 225) { facing = "North"; axis = "-Z"; }
+	else { facing = "East"; axis = "+X"; }
+
+	const char* biomeName = "unknown";
+	Biome* biome = level->getBiome(bx, bz);
+	if (biome) biomeName = biome->name.c_str();
+
+	std::string lookingAt = "Air";
+	if (minecraft->hitResult.type == TILE) {
+		const int tileId = level->getTile(minecraft->hitResult.x,
+			minecraft->hitResult.y, minecraft->hitResult.z);
+		if (tileId > 0 && tileId < 256 && Tile::tiles[tileId])
+			lookingAt = Tile::tiles[tileId]->getDescriptionId();
+	}
+
+	static int fps = 0;
+	static int frames = 0;
+	static float lastFpsTime = 0;
+	const float now = getTimeS();
+	++frames;
+	if (now - lastFpsTime >= 1.0f) {
+		fps = (int)(frames / (now - lastFpsTime));
+		frames = 0;
+		lastFpsTime = now;
+	}
+
+	char lines[8][192];
+	sprintf(lines[0], "Minecraft PE 0.6.1");
+	sprintf(lines[1], "%d fps", fps);
+	sprintf(lines[2], "XYZ: %.3f / %.3f / %.3f", player->x, player->y - player->heightOffset, player->z);
+	sprintf(lines[3], "Block: %d %d %d   Chunk: %d %d", bx, by, bz, cx, cz);
+	sprintf(lines[4], "Facing: %s (%s)  (%.1f / %.1f)", facing, axis, player->yRot, player->xRot);
+	sprintf(lines[5], "Biome: %s", biomeName);
+	sprintf(lines[6], "Day %ld  Time: %ld  Seed: %ld", level->getTime() / Level::TICKS_PER_DAY,
+		level->getTime() % Level::TICKS_PER_DAY, level->getSeed());
+	sprintf(lines[7], "Looking at: %s", lookingAt.c_str());
+
+	const int lineHeight = Font::DefaultLineHeight;
+	for (int i = 0; i < 8; ++i) {
+		const int y = 2 + i * lineHeight;
+		fill(1, y - 1, minecraft->font->width(lines[i]) + 5, y + lineHeight - 1, 0x90000000);
+		minecraft->font->drawShadow(lines[i], 3, y, i == 0 ? 0xffff55 : 0xffffff);
+	}
 }
 
 void Gui::renderSleepAnimation( const int screenWidth, const int screenHeight ) {

@@ -278,8 +278,11 @@ void Level::tickTiles() {
 		for (int i = 0; i < pollChunkOffsetsSize; i += 2) {
 			const int xp = xx + pollChunkOffsets[i];
 			const int zp = zz + pollChunkOffsets[i+1];
-			if (xp >= 0 && xp < CHUNK_CACHE_WIDTH &&
-				zp >= 0 && zp < CHUNK_CACHE_WIDTH)
+			// Infinite worlds (including Sky) keep chunks at signed world
+			// coordinates. Applying the Old-world 0..15 cache limit here leaves
+			// random ticks disabled outside that square.
+			if (levelData.isInfinite() || (xp >= 0 && xp < CHUNK_CACHE_WIDTH &&
+				zp >= 0 && zp < CHUNK_CACHE_WIDTH))
 				_chunksToPoll.insert(ChunkPos(xp, zp));
 		}
     }
@@ -434,7 +437,42 @@ bool Level::findPath(Path* path, Entity* from, int xBest, int yBest, int zBest, 
 * location for the demo version.
 */
 /*protected*/
+bool Level::findSkySpawn(int x, int z) {
+    if (dimension->isValidSpawn(x, z)) {
+        levelData.setSpawn(x, getTopTileY(x, z), z);
+        return true;
+    }
+    // Search complete chunks in square rings, at most 17 x 17 chunks.
+    // No random walk, no seed changes and no artificial spawn platform.
+    int centerX = Mth::floor(x / 16.0f);
+    int centerZ = Mth::floor(z / 16.0f);
+    for (int radius = 0; radius <= 8; ++radius)
+        for (int cx = -radius; cx <= radius; ++cx)
+            for (int cz = -radius; cz <= radius; ++cz) {
+                if (radius && cx != -radius && cx != radius && cz != -radius && cz != radius)
+                    continue;
+                for (int xx = 0; xx < 16; ++xx)
+                    for (int zz = 0; zz < 16; ++zz) {
+                        int sx = (centerX + cx) * 16 + xx;
+                        int sz = (centerZ + cz) * 16 + zz;
+                        if (dimension->isValidSpawn(sx, sz)) {
+                            levelData.setSpawn(sx, getTopTileY(sx, sz), sz);
+                            return true;
+                        }
+                    }
+            }
+    levelData.setSpawn(x, -1, z);
+    LOGI("Sky: no safe spawn within 8 chunks of (%d, %d)\n", x, z);
+    return false;
+}
+
 void Level::setInitialSpawn() {
+    if (levelData.getWorldType() == WorldType::Sky) {
+        isFindingSpawn = true;
+        findSkySpawn(8, 8);
+        isFindingSpawn = false;
+        return;
+    }
     isFindingSpawn = true;
     // Infinite worlds start at the center of the first chunk, not the corner.
     int xSpawn = levelData.isInfinite() ? 8 : CHUNK_CACHE_WIDTH * CHUNK_WIDTH / 2;
@@ -458,6 +496,10 @@ void Level::setInitialSpawn() {
 
 /*public*/
 void Level::validateSpawn() {
+    if (levelData.getWorldType() == WorldType::Sky) {
+        findSkySpawn(levelData.getXSpawn(), levelData.getZSpawn());
+        return;
+    }
     if (levelData.getYSpawn() <= 0) {
         levelData.setYSpawn(64);
     }
@@ -480,6 +522,10 @@ void Level::validateSpawn() {
 }
 
 int Level::getTopTile(int x, int z) {
+    if (levelData.getWorldType() == WorldType::Sky) {
+        int y = getTopTileY(x, z);
+        return y < 0 ? 0 : getTile(x, y, z);
+    }
     int y = 63;
     while (!isEmptyTile(x, y + 1, z)) {
         y++;
@@ -488,6 +534,15 @@ int Level::getTopTile(int x, int z) {
 }
 
 int Level::getTopTileY(int x, int z) {
+    if (levelData.getWorldType() == WorldType::Sky) {
+        for (int y = DEPTH - 1; y >= 0; --y) {
+            const Material* material = getMaterial(x, y, z);
+            // Snow layers and small plants do not replace the spawn's supporting block.
+            if (material != Material::air && material != Material::topSnow
+                && material != Material::plant && material != Material::replaceable_plant) return y;
+        }
+        return -1;
+    }
     int y = 63;
     while (!isEmptyTile(x, y + 1, z)) {
         y++;
@@ -1207,6 +1262,37 @@ Vec3 Level::getSkyColor(Entity* source, float a) {
     b *= br;
 
     return Vec3(r, g, b);
+}
+
+Vec3 Level::getBetaSkyColor(Entity* source, float a) {
+	// WorldProviderSky fixes the celestial angle at daytime.  Preserve that
+	// visual behaviour only for the Java/Beta renderer; PE rendering continues
+	// to use its normal sky palette and day/night treatment.
+	if (levelData.getWorldType() == WorldType::Sky) {
+		// The fixed Beta Sky tint is #C0C0FF.  Its brightness must follow the
+		// atmospheric sky curve, not the block-light sky-darkening value: the
+		// latter bottoms out above black and leaves the overhead sky too bright.
+		float daylight = Mth::cos(getTimeOfDay(a) * Mth::PI * 2.0f) * 2.0f + 0.5f;
+		daylight = Mth::clamp(daylight, 0.0f, 1.0f);
+		return Vec3(192.0f / 255.0f * daylight,
+			192.0f / 255.0f * daylight, daylight);
+	}
+
+	float daylight = Mth::cos(getTimeOfDay(a) * Mth::PI * 2.0f) * 2.0f + 0.5f;
+	daylight = Mth::clamp(daylight, 0.0f, 1.0f);
+	int x = source ? Mth::floor(source->x) : 0;
+	int z = source ? Mth::floor(source->z) : 0;
+	// PE already generates the same temperature/downfall fields that Beta
+	// queried here; only its normal renderer elected not to use them.
+	// Match Java Beta / win32-port exactly: sky tint uses the direct climate
+	// noise sample, not the adjusted temperature used to choose a biome.
+	BiomeSource* biomeSource = getBiomeSource();
+	float temperature = biomeSource->getTemperature(x, z);
+	Biome* biome = biomeSource->getBiome(x, z);
+	int skyColor = biome->getSkyColor(temperature);
+	return Vec3(((skyColor >> 16) & 255) / 255.0f * daylight,
+		((skyColor >> 8) & 255) / 255.0f * daylight,
+		(skyColor & 255) / 255.0f * daylight);
 }
 
 Vec3 Level::getCloudColor( float a ) {

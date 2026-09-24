@@ -2,9 +2,15 @@
 #include "OptionStrings.h"
 #include "Minecraft.h"
 #include "renderer/LevelRenderer.h"
+#include "renderer/Textures.h"
+#include "player/LocalPlayer.h"
 #include "../platform/log.h"
 #include "../world/Difficulty.h"
 #include <sstream>
+#ifdef WIN32
+#include <windows.h>
+#include <commdlg.h>
+#endif
 /*static*/
 bool Options::debugGl = false;
 
@@ -13,6 +19,7 @@ void Options::initDefaultValues() {
 	hideGui = false;
 	thirdPersonView = false;
 	renderDebug = false;
+	debugScreenEnabled = false;
 	isFlying = false;
 	smoothCamera = true;
 	fixedCamera = false;
@@ -27,6 +34,10 @@ void Options::initDefaultValues() {
 
 	isJoyTouchArea = false;
 	infiniteWorlds = false;
+	betaVisuals = false;
+	slimSkin = false;
+	skinMenu = false;
+	touchSneak = false;
 
 	music = 1;
 	sound = 1;
@@ -163,9 +174,14 @@ const Options::Option
 	Options::Option::USE_TOUCHSCREEN	 (16, "options.usetouchscreen", false, true),
 	Options::Option::USE_TOUCH_JOYPAD	 (17, "options.usetouchpad", false, true),
 	Options::Option::DESTROY_VIBRATION   (18, "options.destroyvibration", false, true),
-	Options::Option::INFINITE_WORLDS     (21, "options.infiniteWorlds", false, true),
+	Options::Option::INFINITE_WORLDS     (21, "options.extraWorldType", false, true),
 	Options::Option::DPAD_SIZE           (22, "options.dpadSize", false, false),
 	Options::Option::INPUT_MODE          (23, "options.inputMode", false, false),
+	Options::Option::BETA_VISUALS        (24, "options.betaVisuals", false, true),
+	Options::Option::SKIN_ARM_TYPE       (25, "options.skinArmType", false, false),
+	Options::Option::SKIN_MENU            (26, "options.skinMenu", false, true),
+	Options::Option::TOUCH_SNEAK          (27, "options.touchSneak", false, true),
+	Options::Option::DEBUG_SCREEN         (28, "options.debugScreen", false, true),
 	Options::Option::PIXELS_PER_MILLIMETER(19, "options.pixelspermilimeter", true, false),
 	Options::Option::FOV                  (20, "options.fov",               true, false);
 
@@ -339,8 +355,23 @@ void Options::update()
 		if (key == OptionStrings::Game_HideGui) {
 			readBool(value, hideGui);
 		}
+		if (key == OptionStrings::Graphics_BetaVisuals) {
+			readBool(value, betaVisuals);
+		}
 		if (key == OptionStrings::Extra_InfiniteWorlds) {
 			readBool(value, infiniteWorlds);
+		}
+		if (key == OptionStrings::Skin_ArmType) {
+			readBool(value, slimSkin);
+		}
+		if (key == OptionStrings::Touch_Sneak) {
+			readBool(value, touchSneak);
+		}
+		if (key == OptionStrings::Extra_DebugScreen) {
+			readBool(value, debugScreenEnabled);
+		}
+		if (key == OptionStrings::Skin_Menu) {
+			readBool(value, skinMenu);
 		}
 	}
     
@@ -412,6 +443,10 @@ void Options::save()
 	addOptionToSaveOutput(stringVec, OptionStrings::Game_ThirdPerson, thirdPersonView);
 	addOptionToSaveOutput(stringVec, OptionStrings::Game_HideGui, hideGui);
 	addOptionToSaveOutput(stringVec, OptionStrings::Extra_InfiniteWorlds, infiniteWorlds);
+	addOptionToSaveOutput(stringVec, OptionStrings::Skin_ArmType, slimSkin);
+	addOptionToSaveOutput(stringVec, OptionStrings::Skin_Menu, skinMenu);
+	addOptionToSaveOutput(stringVec, OptionStrings::Touch_Sneak, touchSneak);
+	addOptionToSaveOutput(stringVec, OptionStrings::Extra_DebugScreen, debugScreenEnabled);
 
 	// Input
 	addOptionToSaveOutput(stringVec, OptionStrings::Controls_InvertMouse, invertYMouse);
@@ -429,6 +464,7 @@ void Options::save()
 	addOptionToSaveOutput(stringVec, OptionStrings::Graphics_RenderDistance, viewDistance);
 	addOptionToSaveOutput(stringVec, OptionStrings::Graphics_GuiScale, guiScale);
 	addOptionToSaveOutput(stringVec, OptionStrings::Graphics_FOV, fieldOfView);
+	addOptionToSaveOutput(stringVec, OptionStrings::Graphics_BetaVisuals, betaVisuals);
 // 
 // 	static const Option MUSIC;
 // 	static const Option SOUND;
@@ -493,6 +529,58 @@ void Options::addOptionToSaveOutput(StringVector& stringVector, std::string name
 	std::stringstream ss;
 	ss << name << ":" << value;
 	stringVector.push_back(ss.str());
+}
+
+void Options::clearImportedSkin() {
+	std::string skinPath = "data/images/skins/local.png";
+#ifdef WIN32
+	char executablePath[MAX_PATH] = { 0 };
+	DWORD length = GetModuleFileNameA(NULL, executablePath, MAX_PATH);
+	if (length > 0 && length < MAX_PATH) {
+		skinPath.assign(executablePath, length);
+		std::string::size_type slash = skinPath.find_last_of("\\/");
+		if (slash != std::string::npos)
+			skinPath.erase(slash + 1);
+		skinPath += "data/images/skins/local.png";
+	}
+#endif
+	remove(skinPath.c_str());
+	if (minecraft && minecraft->player)
+		minecraft->player->setTextureName("mob/char.png");
+}
+
+void Options::importSkinFromFile() {
+#ifdef WIN32
+	char sourcePath[MAX_PATH] = { 0 };
+	OPENFILENAMEA dialog = { 0 };
+	dialog.lStructSize = sizeof(dialog);
+	dialog.hwndOwner = NULL;
+	dialog.lpstrFile = sourcePath;
+	dialog.nMaxFile = MAX_PATH;
+	dialog.lpstrFilter = "PNG skin (*.png)\0*.png\0PNG files\0*.png\0\0";
+	dialog.nFilterIndex = 1;
+	dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+	if (!GetOpenFileNameA(&dialog))
+		return;
+
+	char executablePath[MAX_PATH] = { 0 };
+	DWORD length = GetModuleFileNameA(NULL, executablePath, MAX_PATH);
+	if (length == 0 || length >= MAX_PATH)
+		return;
+	std::string destination(executablePath, length);
+	std::string::size_type slash = destination.find_last_of("\\/");
+	if (slash == std::string::npos)
+		return;
+	destination.erase(slash + 1);
+	destination += "data/images/skins/local.png";
+	if (!CopyFileA(sourcePath, destination.c_str(), FALSE))
+		return;
+
+	if (minecraft && minecraft->textures)
+		minecraft->textures->reloadAll();
+	if (minecraft && minecraft->player)
+		minecraft->player->setTextureName("skins/local.png");
+#endif
 }
 
 std::string Options::getMessage( const Option* item )

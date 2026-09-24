@@ -61,7 +61,12 @@ static std::string sliderValueText(SliderType sliderType, const Options::Option*
 			int idx = Mth::clamp(curStepValue, 0, 2);
 			return I18n::get(Options::DPAD_SIZE[idx]);
 		} else if (option == &Options::Option::INPUT_MODE) {
-			return I18n::get(curStepValue ? "options.inputMode.touch" : "options.inputMode.keyboardMouse");
+			// The surrounding row is already labelled "Input Mode".  A compact
+			// desktop label keeps this value inside the option pane at every GUI
+			// scale, unlike the old "Keyboard & Mouse" string.
+			return curStepValue ? "Touch" : "Keyboard";
+		} else if (option == &Options::Option::SKIN_ARM_TYPE) {
+			return I18n::get(curStepValue ? "options.skinArmType.slim" : "options.skinArmType.classic");
 		} else if (option == &Options::Option::GRAPHICS) {
 			return curStepValue ? I18n::get("options.graphics.fancy") : I18n::get("options.graphics.fast");
 		}
@@ -74,7 +79,7 @@ static std::string sliderValueText(SliderType sliderType, const Options::Option*
 
 void Slider::render( Minecraft* minecraft, int xm, int ym ) {
 	// Reserve right portion for value text (~32px)
-	const int textAreaW = (option == &Options::Option::INPUT_MODE) ? 74 : 32;
+	const int textAreaW = (option == &Options::Option::INPUT_MODE || option == &Options::Option::SKIN_ARM_TYPE) ? 56 : 32;
 	int xSliderStart = x + 5;
 	int xSliderEnd = x + width - 5 - textAreaW;
 	int barHeight = 4;
@@ -131,7 +136,7 @@ void Slider::tick(Minecraft* minecraft) {
 		minecraft->screen->toGUICoordinate(xm, ym);
 		if(mouseDownOnElement) {
 			const int xSliderStart = x + 5;
-			const int textAreaW = (option == &Options::Option::INPUT_MODE) ? 74 : 32;
+			const int textAreaW = (option == &Options::Option::INPUT_MODE || option == &Options::Option::SKIN_ARM_TYPE) ? 56 : 32;
 			const int sliderWidth = width - 10 - textAreaW; // must match render()
 			if (sliderWidth <= 0) return;
 			percentage = float(xm - xSliderStart) / float(sliderWidth);

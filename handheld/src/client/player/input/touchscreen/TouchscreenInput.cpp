@@ -7,6 +7,7 @@
 
 #include "../../../Minecraft.h"
 #include "../../../../platform/log.h"
+#include "../../../../platform/input/TouchTrace.h"
 #include "../../../renderer/Textures.h"
 #include "../../../sound/SoundEngine.h"
 
@@ -16,7 +17,10 @@ static const int AREA_DPAD_S = 101;
 static const int AREA_DPAD_W = 102;
 static const int AREA_DPAD_E = 103;
 static const int AREA_DPAD_C = 104;
-static const int AREA_PAUSE = 105;
+static const int AREA_DPAD_J = 105;
+static const int AREA_PAUSE = 106;
+static const int AREA_FLIGHT_UP = 107;
+static const int AREA_FLIGHT_DOWN = 108;
 
 static int cPressed = 0;
 static int cReleased = 0;
@@ -74,11 +78,18 @@ TouchscreenInput_TestFps::TouchscreenInput_TestFps( Minecraft* mc, Options* opti
 	aUp(0),
 	aDown(0),
 	aJump(0),
+	aSneak(0),
+	aJumpRight(0),
+	aFlightUp(0),
+	aFlightDown(0),
 	aUpLeft(0),
 	aUpRight(0),
 	_allowHeightChange(false),
-	_dpadPointerId(-1)
+	_dpadPointerId(-1),
+	_legacyFlightHeightMode(false),
+	_legacyFlightPointer(-1)
 {
+	TOUCH_TRACE("touch-lifecycle: ctor this=%p options=%p\n", this, options);
 	releaseAllKeys();
 	onConfigChanged( createConfig(mc) );
 
@@ -92,14 +103,27 @@ TouchscreenInput_TestFps::TouchscreenInput_TestFps( Minecraft* mc, Options* opti
 }
 
 TouchscreenInput_TestFps::~TouchscreenInput_TestFps() {
+	TOUCH_TRACE("touch-lifecycle: dtor this=%p\n", this);
 	clear();
 }
 
 void TouchscreenInput_TestFps::clear() {
+	TOUCH_TRACE("touch-lifecycle: clear-begin this=%p\n", this);
 	_model.clear();
+	// These areas are owned by TouchAreaModel.  Clear the non-owning pointers
+	// immediately so a render that races a layout rebuild cannot use freed
+	// storage.
+	aLeft = aRight = aUp = aDown = aPause = NULL;
+	aJump = aSneak = aJumpRight = NULL;
 
 	delete aUpLeft; aUpLeft = NULL; // @todo: SAFEDEL
 	delete aUpRight; aUpRight = NULL;
+	// Flight buttons are owned by TouchAreaModel after addArea().  Do not
+	// delete them here after _model.clear(), otherwise changing touch options
+	// causes a double free during the next game initialization.
+	aFlightUp = NULL;
+	aFlightDown = NULL;
+	TOUCH_TRACE("touch-lifecycle: clear-end this=%p\n", this);
 }
 
 bool TouchscreenInput_TestFps::isButtonDown(int areaId) {
@@ -108,6 +132,7 @@ bool TouchscreenInput_TestFps::isButtonDown(int areaId) {
 
 
 void TouchscreenInput_TestFps::onConfigChanged(const Config& c) {
+	TOUCH_TRACE("touch-lifecycle: config-begin this=%p size=(%d,%d)\n", this, c.width, c.height);
 	clear();
 
 	const float w = (float)c.width;
@@ -157,7 +182,24 @@ void TouchscreenInput_TestFps::onConfigChanged(const Config& c) {
 	aUpRight = new RectangleArea(xx, yy, xx+Bw, yy+Bh);
 
 	xx = BaseX + Bw; yy = BaseY + Bh;
-	_model.addArea(AREA_DPAD_C, aJump = new RectangleArea(xx, yy, xx+Bw, yy+Bh));
+	_model.addArea(AREA_DPAD_C, aSneak = new RectangleArea(xx, yy, xx+Bw, yy+Bh));
+	if (_options->touchSneak) {
+		// Keep the jump/flight control clear of the edge so its full hit area is
+		// visible and usable on narrow screens.
+		const float jumpX = _options->isLeftHanded ? 8.0f : (w - 8.0f - 2.0f * Bw);
+		_model.addArea(AREA_DPAD_J, aJumpRight = new RectangleArea(jumpX, BaseY + Bh, jumpX + Bw, BaseY + 2 * Bh));
+		// The flight render path uses aJump as its generic jump surface.
+		// Bind it to the valid right-side control in the new layout instead of
+		// leaving it null or pointing at an area freed by a previous rebuild.
+		aJump = aJumpRight;
+		_model.addArea(AREA_FLIGHT_UP, aFlightUp = new RectangleArea(jumpX, BaseY,
+			jumpX + Bw, BaseY + Bh));
+		_model.addArea(AREA_FLIGHT_DOWN, aFlightDown = new RectangleArea(jumpX,
+			BaseY + 2 * Bh, jumpX + Bw, BaseY + 3 * Bh));
+	} else {
+		aJump = aSneak;
+		aJumpRight = aSneak;
+	}
 
 	xx = BaseX + Bw; yy = BaseY + 2 * Bh;
 	_model.addArea(AREA_DPAD_S, aDown = new RectangleArea(xx, yy, xx+Bw, yy+Bh));
@@ -168,12 +210,33 @@ void TouchscreenInput_TestFps::onConfigChanged(const Config& c) {
 	xx = BaseX + 2 * Bw; yy = BaseY + Bh;
 	_model.addArea(AREA_DPAD_E, aRight = new RectangleArea(xx, yy, xx+Bw, yy+Bh));
 
-    float maxPixels = _minecraft->pixelCalc.millimetersToPixels(10);
-    float btnSize = Mth::Min(18 * Gui::GuiScale, maxPixels);
+	// The pause control follows the GUI Scale setting directly, independently
+	// of the D-Pad size option.  Small is the original PE-sized button; larger
+	// GUI settings progressively reduce the logical button size.
+	float pauseLogicalSize = 16.0f; // Auto
+	switch (_options->guiScale) {
+		case 1: pauseLogicalSize = 18.0f; break; // Small: original size
+		case 2: pauseLogicalSize = 16.0f; break; // Medium
+		case 3: pauseLogicalSize = 14.0f; break; // Normal
+		case 4: pauseLogicalSize = 12.0f; break; // Large
+		default: break; // Auto
+	}
+	const float btnSize = pauseLogicalSize * Gui::GuiScale;
 	_model.addArea(AREA_PAUSE, aPause = new RectangleArea(w - 4 - btnSize,
                                                           4,
                                                           w - 4,
-                                                          4 + btnSize));
+	                                                          4 + btnSize));
+	TOUCH_TRACE("touch-layout: screen=(%.0f,%.0f) sneak=%d dpad=(%.1f,%.1f,%.1f,%.1f) sneakArea=(%.1f,%.1f,%.1f,%.1f) jumpArea=(%.1f,%.1f,%.1f,%.1f) flightUp=(%.1f,%.1f,%.1f,%.1f) flightDown=(%.1f,%.1f,%.1f,%.1f)\n",
+		w, h, _options->touchSneak ? 1 : 0,
+		_boundingRectangle._x0, _boundingRectangle._y0, _boundingRectangle._x1, _boundingRectangle._y1,
+		aSneak->_x0, aSneak->_y0, aSneak->_x1, aSneak->_y1,
+		aJumpRight ? aJumpRight->_x0 : -1, aJumpRight ? aJumpRight->_y0 : -1,
+		aJumpRight ? aJumpRight->_x1 : -1, aJumpRight ? aJumpRight->_y1 : -1,
+		aFlightUp ? aFlightUp->_x0 : -1, aFlightUp ? aFlightUp->_y0 : -1,
+		aFlightUp ? aFlightUp->_x1 : -1, aFlightUp ? aFlightUp->_y1 : -1,
+		aFlightDown ? aFlightDown->_x0 : -1, aFlightDown ? aFlightDown->_y0 : -1,
+		aFlightDown ? aFlightDown->_x1 : -1, aFlightDown ? aFlightDown->_y1 : -1);
+	TOUCH_TRACE("touch-lifecycle: config-end this=%p\n", this);
 
 	//rebuild();
 }
@@ -199,10 +262,11 @@ void TouchscreenInput_TestFps::setKey( int key, bool state )
 
 void TouchscreenInput_TestFps::releaseAllKeys()
 {
+	TOUCH_TRACE("touch-lifecycle: release-all this=%p\n", this);
 	xa = 0;
 	ya = 0;
 
-	for (int i = 0; i<8; ++i)
+	for (int i = 0; i<10; ++i)
 		_buttons[i] = false;
 #ifdef WIN32
 	for (int i = 0; i<NumKeys; ++i)
@@ -210,6 +274,8 @@ void TouchscreenInput_TestFps::releaseAllKeys()
 #endif
 	_pressedJump = false;
 	_allowHeightChange = false;
+	_legacyFlightHeightMode = false;
+	_legacyFlightPointer = -1;
 }
 
 void TouchscreenInput_TestFps::tick( Player* player )
@@ -217,13 +283,21 @@ void TouchscreenInput_TestFps::tick( Player* player )
 	xa = 0;
 	ya = 0;
 	jumping = false;
+	// These are derived from the current frame's contacts only.  Explicitly
+	// clear them before processing pointers so a world exit/re-entry cannot
+	// inherit a stale flight direction.
+	wantUp = false;
+	wantDown = false;
 
 	//bool gotEvent = false;
 	bool heldJump = false;
 	bool tmpForward = false;
 	bool tmpNorthJump = false;
 
-	for (int i = 0; i < 6; ++i)
+	// Clear every touch-control slot, including the right-side flight buttons
+	// (indices 7 and 8).  Leaving those slots set makes ascent/descent persist
+	// after the finger is released and can destabilize the next world entry.
+	for (int i = 0; i < 10; ++i)
 		_buttons[i] = false;
 
 	const int* pointerIds;
@@ -238,11 +312,15 @@ void TouchscreenInput_TestFps::tick( Player* player )
 		for (int i = 0; i < pointerCount; ++i) {
 			int p = pointerIds[i];
 			int areaId = _model.getPointerId(Multitouch::getX(p), Multitouch::getY(p), p);
-			if (Multitouch::isPressed(p) && areaId >= AREA_DPAD_N && areaId <= AREA_DPAD_C) {
+			if (Multitouch::isPressed(p) && areaId >= AREA_DPAD_N && areaId <= AREA_FLIGHT_DOWN) {
 				_dpadPointerId = p;
 				break;
 			}
 		}
+	}
+	if (_legacyFlightPointer >= 0 && !Multitouch::isPointerDown(_legacyFlightPointer)) {
+		_legacyFlightPointer = -1;
+		_legacyFlightHeightMode = false;
 	}
 
 	for (int i = 0; i < pointerCount; ++i) {
@@ -259,50 +337,83 @@ void TouchscreenInput_TestFps::tick( Player* player )
 		}
 
 		int areaId = _model.getPointerId(x, y, p);
+		if (Multitouch::isPressed(p) || Multitouch::isReleased(p))
+			TOUCH_TRACE("touch-area: pointer=%d event=%s pos=(%d,%d) area=%d flying=%d\n",
+				p, Multitouch::isPressed(p) ? "down" : "up", x, y, areaId,
+				player->abilities.flying ? 1 : 0);
 		if (areaId < AREA_DPAD_FIRST)
 		{
 			continue;
 		}
-		if (areaId != AREA_PAUSE && p != _dpadPointerId)
+		// Flight uses the right-side jump key together with the D-Pad's
+		// vertical directions, so allow multiple D-Pad contacts in that mode.
+		if (areaId != AREA_PAUSE && p != _dpadPointerId &&
+			!player->abilities.flying)
 			continue;
 
 		bool setButton = false;
 
 		if (Multitouch::isPressed(p))
-			_allowHeightChange = (areaId == AREA_DPAD_C);
+			_allowHeightChange = _options->touchSneak ? (areaId == AREA_DPAD_J) : (areaId == AREA_DPAD_C);
 
-        if (areaId == AREA_DPAD_C)
+		if (areaId == AREA_DPAD_C)
 		{
 			setButton = true;
+			if (_options->touchSneak) {
+				if (Multitouch::isPressed(p)) {
+					// Match the jump button's double-tap behavior: a single tap
+					// arms the action, the second tap toggles sneaking.
+					float now = getTimeS();
+					if (now - _sneakTapTime < 0.4f) {
+						sneaking = !sneaking;
+						player->setSneaking(sneaking);
+						_sneakTapTime = -1;
+					} else {
+						_sneakTapTime = now;
+					}
+				}
+			} else {
+				heldJump = true;
+				if (player->abilities.flying && !_options->touchSneak && Multitouch::isPressed(p)) {
+					_legacyFlightHeightMode = true;
+					_legacyFlightPointer = p;
+				}
+				// If we're in water or pressed down on the button: jump
+				if (player->isInWater()) {
+					jumping = true;
+				}
+				else if (Multitouch::isPressed(p)) {
+					jumping = true;
+				}
+			}
+		}
+		if (areaId == AREA_DPAD_J) {
+			setButton = true;
 			heldJump = true;
-			// If we're in water or pressed down on the button: jump
-			if (player->isInWater()) {
-				jumping = true;
-			}
-			else if (Multitouch::isPressed(p)) {
-				jumping = true;
-			} // Or if we are walking forward, jump while going forward!
-			else if (_forward && !player->abilities.flying) {
-				areaId = AREA_DPAD_N;
-				tmpNorthJump = true;
-				//jumping = true;
-				ya += 1;
-			}
+			if (player->isInWater() || Multitouch::isPressed(p)) jumping = true;
+			else if (!isChangingFlightHeight) jumping = true;
+		}
+		if (areaId == AREA_FLIGHT_UP || areaId == AREA_FLIGHT_DOWN) {
+			setButton = true;
+			if (!player->abilities.flying) setButton = false;
 		}
 
 		if	(areaId == AREA_DPAD_N)
 		{
 			setButton = true;
-			if (player->isInWater())
-				jumping = true;
-			else if (!isChangingFlightHeight)
-				tmpForward = true;
-			ya += 1;
+			// Legacy flight keeps forward/back movement on the normal D-pad.
+			// Holding the jump button acts as the height modifier.
+			if (player->abilities.flying && !_options->touchSneak && _legacyFlightHeightMode)
+				ya += 1;
+			else {
+				if (!isChangingFlightHeight) tmpForward = true;
+				ya += 1;
+			}
 		}
 		else if (areaId == AREA_DPAD_S && !_forward)
 		{
 			setButton = true;
-            ya -= 1;
+			ya -= 1;
 			/*
             if (Multitouch::isReleased(p)) {
                 float now = getTimeS();
@@ -327,6 +438,12 @@ void TouchscreenInput_TestFps::tick( Player* player )
 			setButton = true;
 			xa -= 1;
 		}
+		else if (areaId == AREA_FLIGHT_UP) {
+			ya += 1;
+		}
+		else if (areaId == AREA_FLIGHT_DOWN) {
+			ya -= 1;
+		}
 		else if (areaId == AREA_PAUSE) {
 			if (Multitouch::isReleased(p)) {
                 _minecraft->soundEngine->playUI("random.click", 1, 1);
@@ -337,6 +454,8 @@ void TouchscreenInput_TestFps::tick( Player* player )
 	}
 
 	_forward = tmpForward;
+	if (player->abilities.flying && !_options->touchSneak && _legacyFlightHeightMode)
+		_forward = false;
 
 	// Only jump once at a time
 	if (tmpNorthJump) {
@@ -347,8 +466,34 @@ void TouchscreenInput_TestFps::tick( Player* player )
 	else _northJump = false;
 
 	isChangingFlightHeight = false;
-	wantUp   = isButtonDown(AREA_DPAD_N) && (_allowHeightChange & (_pressedJump | wantUp));
-	wantDown = isButtonDown(AREA_DPAD_S) && (_allowHeightChange & (_pressedJump | wantDown));
+	// In creative flight, hold the jump button as a modifier and use the
+	// vertical D-pad directions for ascent/descent.  Do not treat the same
+	// contacts as ordinary forward/back movement while changing height.
+	if (player->abilities.flying && _options->touchSneak) {
+		// The jump key is the flight modifier.  Accept both a held contact and
+		// the immediately preceding tap so a second finger can select a height.
+		const bool flightModifier = heldJump || _pressedJump;
+		wantUp = flightModifier && isButtonDown(AREA_DPAD_N);
+		wantDown = flightModifier && isButtonDown(AREA_DPAD_S);
+	} else {
+		// Legacy center-jump flight mode: only the current/previous jump
+		// contact may enable vertical movement.  Do not feed wantUp/wantDown
+		// back into their own calculation, otherwise the state sticks forever.
+		const bool jumpModifier = heldJump || _pressedJump;
+		if (player->abilities.flying && !_options->touchSneak) {
+			wantUp = _legacyFlightHeightMode && isButtonDown(AREA_DPAD_N);
+			wantDown = _legacyFlightHeightMode && isButtonDown(AREA_DPAD_S);
+		} else {
+			wantUp   = isButtonDown(AREA_DPAD_N) && _allowHeightChange && jumpModifier;
+			wantDown = isButtonDown(AREA_DPAD_S) && _allowHeightChange && jumpModifier;
+		}
+	}
+	// Keep the flight controls functional even when the jump modifier is not
+	// held: the D-pad's up/down buttons are explicit ascent/descent controls.
+	if (player->abilities.flying && _options->touchSneak) {
+		wantUp = isButtonDown(AREA_FLIGHT_UP);
+		wantDown = isButtonDown(AREA_FLIGHT_DOWN);
+	}
 	if (player->abilities.flying && (wantUp || wantDown || (heldJump && !_forward)))
 	{
 		isChangingFlightHeight = true;
@@ -368,8 +513,25 @@ void TouchscreenInput_TestFps::tick( Player* player )
 #endif
 
 	if (sneaking) {
-		xa *= 0.3f;
-		ya *= 0.3f;
+		// Keep touch sneak movement in line with the keyboard Shift speed.
+		xa *= 0.2f;
+		ya *= 0.2f;
+	}
+	static int lastFlying = -1, lastForward = -1, lastJump = -1, lastSneak = -1;
+	static int lastUp = -1, lastDown = -1, lastHeight = -1;
+	const int nowFlying = player->abilities.flying ? 1 : 0;
+	const int nowForward = _forward ? 1 : 0;
+	const int nowJump = jumping ? 1 : 0;
+	const int nowSneak = sneaking ? 1 : 0;
+	const int nowUp = wantUp ? 1 : 0;
+	const int nowDown = wantDown ? 1 : 0;
+	const int nowHeight = isChangingFlightHeight ? 1 : 0;
+	if (nowFlying != lastFlying || nowForward != lastForward || nowJump != lastJump ||
+		nowSneak != lastSneak || nowUp != lastUp || nowDown != lastDown || nowHeight != lastHeight) {
+		TOUCH_TRACE("touch-input: flying=%d forward=%d jump=%d sneak=%d up=%d down=%d xa=%.2f ya=%.2f height=%d\n",
+			nowFlying, nowForward, nowJump, nowSneak, nowUp, nowDown, xa, ya, nowHeight);
+		lastFlying = nowFlying; lastForward = nowForward; lastJump = nowJump;
+		lastSneak = nowSneak; lastUp = nowUp; lastDown = nowDown; lastHeight = nowHeight;
 	}
 	//printf("\n>- %f %f\n", xa, ya);
 	_pressedJump = heldJump;
@@ -391,6 +553,16 @@ static void drawRectangleArea(Tesselator& t, RectangleArea* a, int ux, int vy, f
 	t.vertexUV(x0, y0, 0, uu,	vv);
 }
 
+static void drawRectangleAreaScaled(Tesselator& t, RectangleArea* a, int ux, int vy,
+	float sourceSize, float scale) {
+	const float cx = (a->_x0 + a->_x1) * 0.5f;
+	const float cy = (a->_y0 + a->_y1) * 0.5f;
+	const float hw = (a->_x1 - a->_x0) * scale * 0.5f;
+	const float hh = (a->_y1 - a->_y0) * scale * 0.5f;
+	RectangleArea visual(cx - hw, cy - hh, cx + hw, cy + hh);
+	drawRectangleArea(t, &visual, ux, vy, sourceSize);
+}
+
 static void drawPolygonArea(Tesselator& t, PolygonArea* a, int x, int y) {
 	float pm = 1.0f / 256.0f;
 	float sz = 64.0f * pm;
@@ -406,6 +578,11 @@ static void drawPolygonArea(Tesselator& t, PolygonArea* a, int x, int y) {
 }
 
 void TouchscreenInput_TestFps::render( float a ) {
+	// During the very first window bootstrap frame the viewport may still be
+	// 1x1.  Avoid dereferencing touch areas until layout construction finishes.
+	if (!aLeft || !aRight || !aUp || !aDown || !aSneak || !aPause ||
+		(_options->touchSneak && (!aJumpRight || (_renderFlightImage && (!aFlightUp || !aFlightDown)))))
+		return;
 	//return;
 
 	//static Stopwatch sw;
@@ -472,14 +649,10 @@ void TouchscreenInput_TestFps::rebuild() {
 	// render forward button
 	if (isButtonDown(AREA_DPAD_N)) t.colorABGR(cPressed);
 	else						   t.colorABGR(cReleased);
-	if (isChangingFlightHeight)
-	{
+	if (isChangingFlightHeight && !_options->touchSneak)
 		drawRectangleArea(t, aUp, imageU + imageSize * 2, imageV + imageSize, (float)imageSize);
-	}
 	else
-	{
 		drawRectangleArea(t, aUp, imageU, imageV, (float)imageSize);
-	}
 	
 	// render diagonals, if available
 	if (northDiagonals)
@@ -493,26 +666,40 @@ void TouchscreenInput_TestFps::rebuild() {
 	if (northDiagonals) t.colorABGR(cDiscreet);
 	else if (isButtonDown(AREA_DPAD_S)) t.colorABGR(cPressed);
 	else						   t.colorABGR(cReleased);
-	if (isChangingFlightHeight)
-	{
+	if (isChangingFlightHeight && !_options->touchSneak)
 		drawRectangleArea(t, aDown, imageU + imageSize * 3, imageV + imageSize, (float)imageSize);
-	}
 	else
-	{
 		drawRectangleArea(t, aDown, imageU + imageSize * 2, imageV, (float)imageSize);
-	}
 
 	// render jump / flight button
-	if (_renderFlightImage && northDiagonals) t.colorABGR(cDiscreet);
+		if (_options->touchSneak) t.colorABGR(cReleased);
+		else if (_renderFlightImage && northDiagonals) t.colorABGR(cDiscreet);
 	else if (isButtonDown(AREA_DPAD_C)) t.colorABGR(cPressed);
 	else						   t.colorABGR(cReleased);
-	if (_renderFlightImage)
+	if (_options->touchSneak && !_renderFlightImage)
+		// The sneak artwork occupies its own two 18x18 cells in gui.png.
+		drawRectangleAreaScaled(t, aSneak, imageU + imageSize * 5,
+			isButtonDown(AREA_DPAD_C) ? imageV + 18 : imageV,
+			18.0f, 16.0f / 18.0f);
+	else if (_renderFlightImage && !_options->touchSneak)
 	{
-		drawRectangleArea(t, aJump, imageU + imageSize * 4, imageV + imageSize, (float)imageSize);
+		drawRectangleArea(t, aJump, imageU + imageSize * 4, imageV + imageSize, 26.0f);
 	}
-	else
+	if (_options->touchSneak && _renderFlightImage) {
+		t.colorABGR(isButtonDown(AREA_FLIGHT_UP) ? cPressed : cReleased);
+		drawRectangleArea(t, aFlightUp, imageU, imageV, 26.0f);
+		t.colorABGR(isButtonDown(AREA_FLIGHT_DOWN) ? cPressed : cReleased);
+		drawRectangleArea(t, aFlightDown, imageU + imageSize * 2, imageV, 26.0f);
+	}
+	if (_options->touchSneak) {
+		if (isButtonDown(AREA_DPAD_J)) t.colorABGR(cPressed);
+		else t.colorABGR(cReleased);
+		drawRectangleArea(t, aJumpRight, imageU + imageSize * 4,
+			isButtonDown(AREA_DPAD_J) ? imageV + imageSize : imageV, 26.0f);
+	}
+	else if (!_renderFlightImage)
 	{
-		drawRectangleArea(t, aJump, imageU + imageSize * 4, imageV, (float)imageSize);
+		drawRectangleArea(t, aJump, imageU + imageSize * 4, imageV, 26.0f);
 	}
 	
 

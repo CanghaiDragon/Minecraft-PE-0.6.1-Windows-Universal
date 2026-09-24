@@ -1,5 +1,7 @@
 #include "PlayerRenderer.h"
 #include "EntityRenderDispatcher.h"
+#include "../../Options.h"
+#include "../Textures.h"
 #include "../../../world/entity/player/Player.h"
 #include "../../../world/level/Level.h"
 #include "../../../world/item/ArmorItem.h"
@@ -14,14 +16,55 @@ static const std::string armorFilenames[10] = {
 
 PlayerRenderer::PlayerRenderer( HumanoidModel* humanoidModel, float shadow )
 :	super(humanoidModel, shadow),
-	armorParts1(new HumanoidModel(1.0f)),
-	armorParts2(new HumanoidModel(0.5f))
+	playerModel64(humanoidModel),
+	playerModelSlim(new HumanoidModel(0, 0, 64, 64, true)),
+	playerModel32(new HumanoidModel(0, 0, 64, 32)),
+	armorParts1(new HumanoidModel(1.0f, 0, 64, 32)),
+	armorParts2(new HumanoidModel(0.5f, 0, 64, 32))
 {
+	// Keep both layouts resident.  The appropriate one is selected immediately
+	// before third-person and first-person player rendering.
+	model = playerModel32;
+	humanoidModel = playerModel32;
 }
 
 PlayerRenderer::~PlayerRenderer() {
+	// MobRenderer must not delete either model: this class owns both of them.
+	model = NULL;
+	delete playerModel32;
+	delete playerModel64;
+	delete playerModelSlim;
 	delete armorParts1;
 	delete armorParts2;
+}
+
+bool PlayerRenderer::isModernPlayerSkin(Mob* mob) {
+	const std::string textureName = mob->getTexture();
+
+	// local.png is the documented import target and accepts only the modern
+	// 64x64 layout.  Do not depend on the transient upload cache for it.
+	if (textureName == "skins/local.png") return true;
+
+	TextureId id = entityRenderDispatcher->textures->loadTexture(textureName);
+	if (!Textures::isTextureIdValid(id)) return false;
+	const TextureData* data = entityRenderDispatcher->textures->getTemporaryTextureData(id);
+	return data && data->w == 64 && data->h == 64;
+}
+
+void PlayerRenderer::setModernSkin(Mob* mob) {
+	HumanoidModel* wanted = playerModel32;
+	if (isModernPlayerSkin(mob)) {
+		wanted = (entityRenderDispatcher->options && entityRenderDispatcher->options->slimSkin) ? playerModelSlim : playerModel64;
+	}
+	if (model != wanted || humanoidModel != wanted) {
+		model = wanted;
+		humanoidModel = wanted;
+	}
+}
+
+void PlayerRenderer::render(Entity* mob, float x, float y, float z, float rot, float a) {
+	setModernSkin((Mob*)mob);
+	HumanoidMobRenderer::render(mob, x, y, z, rot, a);
 }
 
 void PlayerRenderer::setupPosition( Entity* mob, float x, float y, float z ) {
@@ -80,8 +123,12 @@ int PlayerRenderer::prepareArmor(Mob* mob, int layer, float a) {
 }
 
 void PlayerRenderer::onGraphicsReset() {
-	super::onGraphicsReset();
+	if (playerModel32) playerModel32->onGraphicsReset();
+	if (playerModel64) playerModel64->onGraphicsReset();
+	if (playerModelSlim) playerModelSlim->onGraphicsReset();
 
 	if (armorParts1) armorParts1->onGraphicsReset();
 	if (armorParts2) armorParts2->onGraphicsReset();
+
+	super::onGraphicsReset();
 }

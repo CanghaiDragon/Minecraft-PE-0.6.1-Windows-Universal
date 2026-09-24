@@ -1,6 +1,9 @@
 #include "GrassTile.h"
 #include "../material/Material.h"
 #include "../../entity/item/ItemEntity.h"
+#include "../GrassColor.h"
+#include "../LevelSource.h"
+#include "../biome/BiomeSource.h"
 
 GrassTile::GrassTile(int id)
 :	super(id, Material::dirt)
@@ -28,7 +31,14 @@ int GrassTile::getColor( LevelSource* level, int x, int y, int z ) {
 	//float temp = level.getBiomeSource().temperatures[0];
 	//float rain = level.getBiomeSource().downfalls[0];
 
-	return 0x339933;//GrassColor.get(temp, rain);
+	// PE 0.6.1 used one fixed grass tint.  Beta uses the original 256x256
+	// grass colour map indexed by the local climate values.
+	if (Tile::useBetaVisuals()) {
+		level->getBiomeSource()->getBiomeBlock(x, z, 1, 1);
+		return GrassColor::get(level->getBiomeSource()->temperatures[0],
+			level->getBiomeSource()->downfalls[0]);
+	}
+	return 0x339933;
 }
 
 void GrassTile::tick( Level* level, int x, int y, int z, Random* random ) {

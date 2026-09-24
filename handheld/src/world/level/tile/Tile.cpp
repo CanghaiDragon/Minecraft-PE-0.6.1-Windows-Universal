@@ -54,6 +54,7 @@ bool Tile::isEntityTile[] = {false};
 bool Tile::translucent[] = {true, false}; // @trans: translucent, @trans "asbMax", some more like "*conditon"
 bool Tile::shouldTick[] = {false};
 bool Tile::sendTileData[] = {false};
+bool Tile::betaVisuals = false;
 
 Tile* Tile::sand        = NULL;
 Tile* Tile::sandStone   = NULL;

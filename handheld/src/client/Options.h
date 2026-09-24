@@ -49,6 +49,11 @@ public:
 		static const Option INFINITE_WORLDS;
 		static const Option DPAD_SIZE;
 		static const Option INPUT_MODE;
+		static const Option BETA_VISUALS;
+		static const Option SKIN_ARM_TYPE;
+		static const Option SKIN_MENU;
+		static const Option TOUCH_SNEAK;
+		static const Option DEBUG_SCREEN;
 
 		static const Option PIXELS_PER_MILLIMETER;
 		static const Option FOV;
@@ -154,6 +159,8 @@ public:
     bool hideGui;
     bool thirdPersonView;
     bool renderDebug;
+	// Enables the F3 debug screen and its touch/pause-screen button.
+	bool debugScreenEnabled;
 
     bool isFlying;
     bool smoothCamera;
@@ -168,6 +175,13 @@ public:
 	bool isJoyTouchArea;
 	bool useTouchScreen;
 	bool infiniteWorlds;
+	// Optional Java Beta-inspired presentation.  This is deliberately a
+	// renderer-only preference: it never changes a world's data or generation.
+	bool betaVisuals;
+	// false = classic 4px arms, true = Java slim 3px arms.
+	bool slimSkin;
+	bool skinMenu;
+	bool touchSneak;
 	float pixelsPerMillimeter;
 	float fieldOfView;
     Options(Minecraft* minecraft, const std::string& workingDirectory)
@@ -238,6 +252,10 @@ public:
 			if (dpadSize > 2) dpadSize = 2;
 		} else if (item == &Option::INPUT_MODE) {
 			useTouchScreen = value != 0;
+		} else if (item == &Option::SKIN_ARM_TYPE) {
+			slimSkin = value != 0;
+		} else if (item == &Option::SKIN_MENU) {
+			skinMenu = value != 0;
 		} else if (item == &Option::GRAPHICS) {
 			fancyGraphics = value != 0;
 		}
@@ -258,6 +276,13 @@ public:
 		}
 		if (option == &Option::INPUT_MODE)
 			useTouchScreen = !useTouchScreen;
+		if (option == &Option::SKIN_ARM_TYPE) slimSkin = !slimSkin;
+		if (option == &Option::SKIN_MENU) skinMenu = !skinMenu;
+		if (option == &Option::TOUCH_SNEAK) touchSneak = !touchSneak;
+		if (option == &Option::DEBUG_SCREEN) {
+			debugScreenEnabled = !debugScreenEnabled;
+			if (!debugScreenEnabled) renderDebug = false;
+		}
         if (option == &Option::VIEW_BOBBING)	bobView = !bobView;
 		if (option == &Option::THIRD_PERSON)	thirdPersonView = !thirdPersonView;
 		if (option == &Option::HIDE_GUI)		hideGui = !hideGui;
@@ -267,6 +292,7 @@ public:
 		if (option == &Option::USE_TOUCH_JOYPAD) isJoyTouchArea = !isJoyTouchArea;
 		if (option == &Option::DESTROY_VIBRATION) destroyVibration = !destroyVibration;
 		if (option == &Option::INFINITE_WORLDS) infiniteWorlds = !infiniteWorlds;
+		if (option == &Option::BETA_VISUALS) betaVisuals = !betaVisuals;
 		if (option == &Option::ANAGLYPH) {
             anaglyph3d = !anaglyph3d;
             //minecraft->textures.reloadAll();
@@ -307,6 +333,7 @@ public:
 		if(item == &Option::GUI_SCALE) return guiScale;
 		if(item == &Option::DPAD_SIZE) return dpadSize;
 		if(item == &Option::INPUT_MODE) return useTouchScreen ? 1 : 0;
+		if(item == &Option::SKIN_ARM_TYPE) return slimSkin ? 1 : 0;
 		if(item == &Option::GRAPHICS) return fancyGraphics ? 1 : 0;
 		return 0;
 	}
@@ -347,6 +374,14 @@ public:
 			return destroyVibration;
 		if (item == &Option::INFINITE_WORLDS)
 			return infiniteWorlds;
+		if (item == &Option::BETA_VISUALS)
+			return betaVisuals;
+		if (item == &Option::SKIN_MENU)
+			return skinMenu;
+		if (item == &Option::TOUCH_SNEAK)
+			return touchSneak;
+		if (item == &Option::DEBUG_SCREEN)
+			return debugScreenEnabled;
 		return false;
 	}
 
@@ -371,10 +406,13 @@ public:
 	std::string getMessage(const Option* item);
 
 	void setSettingsPath(const std::string& path);
+	bool hasSavedOptions() const { return optionsFile.exists(); }
 	void update();
     void load();
     void save();
-    void syncAmbientOcclusion();
+	void syncAmbientOcclusion();
+	void clearImportedSkin();
+	void importSkinFromFile();
 	void addOptionToSaveOutput(StringVector& stringVector, std::string name, bool boolValue);
 	void addOptionToSaveOutput(StringVector& stringVector, std::string name, float floatValue);
 	void addOptionToSaveOutput(StringVector& stringVector, std::string name, int intValue);

@@ -12,6 +12,7 @@ Screen::Screen()
 :   passEvents(false),
 	clickedButton(NULL),
 	tabButtonIndex(0),
+	tabNavigationActive(false),
 	width(1),
 	height(1),
 	minecraft(NULL),
@@ -25,6 +26,8 @@ void Screen::render( int xm, int ym, float a )
 		Button* button = buttons[i];
 		button->render(minecraft, xm, ym);
 	}
+	for (unsigned int i = 0; i < textBoxes.size(); i++)
+		textBoxes[i]->render(minecraft, xm, ym);
 }
 
 void Screen::init( Minecraft* minecraft, int width, int height )
@@ -101,6 +104,12 @@ void Screen::keyboardTextEvent()
 {
 	keyboardNewChar(Keyboard::getChar());
 }
+
+void Screen::keyboardNewChar(char inputChar)
+{
+	for (unsigned int i = 0; i < textBoxes.size(); ++i)
+		textBoxes[i]->charPressed(minecraft, inputChar);
+}
 void Screen::renderBackground()
 {
 	renderBackground(0);
@@ -156,8 +165,11 @@ void Screen::keyPressed( int eventKey )
 {
 	if (eventKey == Keyboard::KEY_ESCAPE) {
 		minecraft->setScreen(NULL);
-		//minecraft->grabMouse();
+		return;
 	}
+	for (unsigned int i = 0; i < textBoxes.size(); ++i)
+		textBoxes[i]->keyPressed(minecraft, eventKey);
+
 	if (minecraft->useTouchscreen())
 		return;
 
@@ -167,10 +179,14 @@ void Screen::keyPressed( int eventKey )
 		return;
 
 	Options& o = minecraft->options;
-	if (eventKey == o.keyMenuNext.key)
+	if (eventKey == o.keyMenuNext.key) {
+		tabNavigationActive = true;
 		if (++tabButtonIndex == tabButtonCount) tabButtonIndex = 0;
-	if (eventKey == o.keyMenuPrevious.key)
+	}
+	if (eventKey == o.keyMenuPrevious.key) {
+		tabNavigationActive = true;
 		if (--tabButtonIndex == -1) tabButtonIndex = tabButtonCount-1;
+	}
 	if (eventKey == o.keyMenuOk.key) {
 		Button* button = tabButtons[tabButtonIndex];
 		if (button->active) {
@@ -188,7 +204,7 @@ void Screen::updateTabButtonSelection()
 		return;
 
 	for (unsigned int i = 0; i < tabButtons.size(); ++i)
-		tabButtons[i]->selected = (i == tabButtonIndex);
+		tabButtons[i]->selected = tabNavigationActive && (i == tabButtonIndex);
 }
 
 void Screen::mouseClicked( int x, int y, int buttonNum )
@@ -211,6 +227,8 @@ void Screen::mouseClicked( int x, int y, int buttonNum )
 			}
 		}
 	}
+	for (unsigned int i = 0; i < textBoxes.size(); ++i)
+		textBoxes[i]->mouseClicked(minecraft, x, y, buttonNum);
 }
 
 void Screen::mouseReleased( int x, int y, int buttonNum )

@@ -322,8 +322,18 @@ void GameRenderer::renderLevel(float a) {
         mc->levelRenderer->cull(&frustum, a);
         mc->levelRenderer->updateDirtyChunks(cameraEntity, false);
 
-		if(mc->options.fancyGraphics) {
+		// PE's projection-reset helper is only suitable for its flat cloud
+		// layer.  Beta sky and fancy clouds are drawn at their original points
+		// in the world render, below.
+		if(mc->options.fancyGraphics && !mc->options.betaVisuals) {
 			prepareAndRenderClouds(levelRenderer, a);
+		}
+		if (mc->options.fancyGraphics && mc->options.betaVisuals) {
+			setupFog(-1);
+			glDepthMask(GL_FALSE);
+			TIMER_POP_PUSH("beta-sky");
+			levelRenderer->renderBetaSky(a);
+			glDepthMask(GL_TRUE);
 		}
 
         setupFog(0);
@@ -331,7 +341,12 @@ void GameRenderer::renderLevel(float a) {
 
 		glEnable2(GL_TEXTURE_2D);
 		mc->textures->loadAndBindTexture("terrain.png");
-        glDisable2(GL_ALPHA_TEST);
+		// Tile 38 (the Java grass-side fringe) has an alpha-zero background.
+		// PE normally disables alpha test for opaque terrain, which turns that
+		// background black when the fringe is overlaid.  Java/Beta keeps the
+		// alpha test enabled for this path.
+		if (mc->options.betaVisuals) glEnable2(GL_ALPHA_TEST);
+		else glDisable2(GL_ALPHA_TEST);
         glDisable2(GL_BLEND);
         glEnable2(GL_CULL_FACE);
 
@@ -396,11 +411,16 @@ void GameRenderer::renderLevel(float a) {
 		}
 
 		glDisable2(GL_FOG);
-//
-//        setupFog(0);
-//        glEnable2(GL_FOG);
-////        levelRenderer->renderClouds(a);
-//        glDisable2(GL_FOG);
+		// Java Beta draws the fancy 3D cloud volume after terrain (including
+		// translucent terrain), not inside PE's sky pre-pass.  Its first
+		// depth-only pass can therefore correctly resolve neighbouring cells.
+		if (mc->options.fancyGraphics && mc->options.betaVisuals) {
+			setupFog(0);
+			glEnable2(GL_FOG);
+			TIMER_POP_PUSH("beta-clouds");
+			levelRenderer->renderBetaClouds(a);
+			glDisable2(GL_FOG);
+		}
         setupFog(1);
 
         if (zoom == 1) {
@@ -609,12 +629,28 @@ void GameRenderer::setupFog(int i) {
 //            bb = bbb;
 //        }
     } else {
+		// The original PE renderer never used a terrain render distance larger
+		// than 256 blocks.  The desktop port adds longer draw-distance tiers,
+		// but using those values for the fog pushes its start far beyond the
+		// original distant-chunk blend.  Keep the extended geometry visible,
+		// while preserving the original PE fog range for terrain.
+		float fogDistance = renderDistance;
+		float fogStart = 0.22f;
+		if (!mc->options.betaVisuals) {
+			if (fogDistance > 256.0f) fogDistance = 256.0f;
+			fogStart = 0.42f;
+		}
+		// The outer chunk ring is built at the selected view distance.  End the
+		// linear fog before that ring, rather than exactly on it, so its square
+		// loading boundary is never exposed at any desktop draw-distance tier.
+		float fogEnd = fogDistance * 0.70f;
+
         glFogx2(GL_FOG_MODE, GL_LINEAR);
-        glFogf2(GL_FOG_START, renderDistance * 0.6f);
-        glFogf2(GL_FOG_END, renderDistance);
+        glFogf2(GL_FOG_START, fogDistance * fogStart);
+        glFogf2(GL_FOG_END, fogEnd);
         if (i < 0) {
             glFogf2(GL_FOG_START, 0);
-            glFogf2(GL_FOG_END, renderDistance * 1.0f);
+            glFogf2(GL_FOG_END, fogEnd);
         }
 
         if (mc->level->dimension->foggy) {
@@ -832,7 +868,9 @@ void GameRenderer::setupClearColor(float a) {
     float whiteness = 1.0f / (4 - _vd2);
     whiteness = 1 - (float) pow(whiteness, 0.25f);
 
-    Vec3 skyColor = level->getSkyColor(mc->cameraTargetPlayer, a);
+	Vec3 skyColor = mc->options.betaVisuals
+		? level->getBetaSkyColor(mc->cameraTargetPlayer, a)
+		: level->getSkyColor(mc->cameraTargetPlayer, a);
     float sr = (float) skyColor.x;
     float sg = (float) skyColor.y;
     float sb = (float) skyColor.z;
@@ -842,9 +880,17 @@ void GameRenderer::setupClearColor(float a) {
     fg = (float) fogColor.y;
     fb = (float) fogColor.z;
 
-    fr += (sr - fr) * whiteness;
-    fg += (sg - fg) * whiteness;
-    fb += (sb - fb) * whiteness;
+	if (mc->options.betaVisuals) {
+		// Java Beta fog follows the current atmospheric sky colour.  PE's
+		// separate fog palette is what created the visible horizon band.
+		fr = sr;
+		fg = sg;
+		fb = sb;
+	} else {
+		fr += (sr - fr) * whiteness;
+		fg += (sg - fg) * whiteness;
+		fb += (sb - fb) * whiteness;
+	}
 
     if (player->isUnderLiquid(Material::water)) {
         fr = 0.02f;

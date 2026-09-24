@@ -26,6 +26,14 @@ void OptionsFile::setSettingsPath(const std::string& path) {
 	settingsPath = path;
 }
 
+bool OptionsFile::exists() const {
+	FILE* pFile = fopen(settingsPath.c_str(), "r");
+	if (pFile == NULL)
+		return false;
+	fclose(pFile);
+	return true;
+}
+
 StringVector OptionsFile::getOptionStrings() {
 	StringVector returnVector;
 	FILE* pFile = fopen(settingsPath.c_str(), "r");

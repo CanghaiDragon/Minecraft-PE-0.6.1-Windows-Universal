@@ -31,17 +31,8 @@
     #define LOGW(fmt, ...) __LOG_PUBLISH(__VA_ARGS__)
 	#define LOGE(fmt, ...) __LOG_PUBLISH(__VA_ARGS__)
 #elif defined(_WIN32)
-	// Normal Windows runs should not flood the console with engine diagnostics
-	// (for example, one line for every sound effect). Keep warnings and errors
-	// visible while leaving verbose/info output available only in a dedicated
-	// diagnostic build that defines MCPE_RUNTIME_VERBOSE_LOGS.
-	#ifdef MCPE_RUNTIME_VERBOSE_LOGS
-		#define LOGV(...) (printf(__VA_ARGS__))
-		#define LOGI(...) (printf(__VA_ARGS__))
-	#else
-		#define LOGV(...) ((void)0)
-		#define LOGI(...) ((void)0)
-	#endif
+	#define LOGV(...) (printf(__VA_ARGS__))
+	#define LOGI(...) (printf(__VA_ARGS__))
 	#define LOGW(...) (fprintf(stderr, __VA_ARGS__))
 	#define LOGE(...) (fprintf(stderr, __VA_ARGS__))
 #else

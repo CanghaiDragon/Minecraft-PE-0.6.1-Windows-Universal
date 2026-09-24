@@ -3,7 +3,33 @@
 #include "ImageButton.h"
 #include "OptionsItem.h"
 #include "Slider.h"
+#include "TextBox.h"
 #include "../../../locale/I18n.h"
+#include "../../sound/SoundEngine.h"
+
+namespace {
+class ClearSkinCacheButton : public Touch::TButton {
+public:
+	ClearSkinCacheButton() : Touch::TButton(0, "Clear") {}
+	virtual void mouseClicked(Minecraft* minecraft, int x, int y, int buttonNum) {
+		if (buttonNum == MouseAction::ACTION_LEFT && clicked(minecraft, x, y)) {
+			minecraft->options.clearImportedSkin();
+			minecraft->soundEngine->playUI("random.click", 1, 1);
+		}
+	}
+};
+
+class ImportSkinButton : public Touch::TButton {
+public:
+	ImportSkinButton() : Touch::TButton(0, "Import") {}
+	virtual void mouseClicked(Minecraft* minecraft, int x, int y, int buttonNum) {
+		if (buttonNum == MouseAction::ACTION_LEFT && clicked(minecraft, x, y)) {
+			minecraft->options.importSkinFromFile();
+			minecraft->soundEngine->playUI("random.click", 1, 1);
+		}
+	}
+};
+}
 
 OptionsGroup::OptionsGroup( std::string labelID )  {
 	label = I18n::get(labelID);
@@ -42,9 +68,48 @@ OptionsGroup& OptionsGroup::addOptionItem( const Options::Option* option, Minecr
 	return *this;
 }
 
+TextBox* OptionsGroup::addTextInput(const std::string& itemLabel, const std::string& hint, const std::string& value) {
+	TextBox* element = new TextBox(0, hint);
+	element->width = 132;
+	element->height = 22;
+	element->text = value;
+	addChild(new OptionsItem(itemLabel, element));
+	setupPositions();
+	return element;
+}
+
+OptionsGroup& OptionsGroup::addDisabledItem(const std::string& itemLabel, const std::string& value) {
+	Button* element = new Button(0, value);
+	element->active = false;
+	element->width = 96;
+	element->height = 20;
+	addChild(new OptionsItem(itemLabel, element));
+	setupPositions();
+	return *this;
+}
+
+OptionsGroup& OptionsGroup::addClearSkinCacheItem(Minecraft* minecraft) {
+	ClearSkinCacheButton* element = new ClearSkinCacheButton();
+	element->width = 70;
+	element->height = 20;
+	addChild(new OptionsItem(I18n::get("options.clearSkinCache"), element));
+	setupPositions();
+	return *this;
+}
+
+OptionsGroup& OptionsGroup::addImportSkinItem(Minecraft* minecraft) {
+	ImportSkinButton* element = new ImportSkinButton();
+	element->width = 70;
+	element->height = 20;
+	addChild(new OptionsItem(I18n::get("options.importSkin"), element));
+	setupPositions();
+	return *this;
+}
+
 void OptionsGroup::createToggle( const Options::Option* option, Minecraft* minecraft ) {
 	ImageDef def;
-	def.setSrc(IntRectangle(160, 206, 39, 20));
+	// The option/toggle icon row in touchguinew.png is at the bottom.
+	def.setSrc(IntRectangle(160, 235, 39, 20));
 	def.name = "gui/touchgui.png";
 	def.width = 39 * 0.7f;
 	def.height = 20 * 0.7f;
@@ -93,6 +158,9 @@ void OptionsGroup::createStepSlider( const Options::Option* option, Minecraft* m
 		steps.push_back(1);
 		steps.push_back(2);
 	} else if (option == &Options::Option::INPUT_MODE) {
+		steps.push_back(0);
+		steps.push_back(1);
+	} else if (option == &Options::Option::SKIN_ARM_TYPE) {
 		steps.push_back(0);
 		steps.push_back(1);
 	} else if (option == &Options::Option::GRAPHICS) {

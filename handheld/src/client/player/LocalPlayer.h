@@ -55,6 +55,7 @@ public:
     void respawn();
 
     void animateRespawn() {}
+	virtual float getWalkingSpeedModifier();
 	float getFieldOfViewModifier();
 	void chat(const std::string& message) {}
     void displayClientMessage(const std::string& messageId);
@@ -78,6 +79,7 @@ public:
 	IMoveInput* input;
 	bool autoJumpEnabled;
 protected:
+	void outOfWorld();
 	Minecraft* minecraft;
 	int jumpTriggerTime;
 	int ascendTriggerTime;
@@ -99,6 +101,12 @@ private:
 	int sentInventoryItemData;
 
 	int armorTypeHash;
+
+	// Creative-only sprint state.  It is intentionally local: Survival keeps
+	// the original PE 0.6.1 movement rules.
+	bool sprinting;
+	int sprintDoubleTapTimer;
+	bool prevForwardHeld;
 };
 
 #endif /*NET_MINECRAFT_CLIENT_PLAYER__LocalPlayer_H__*/

@@ -71,7 +71,8 @@ bool Monster::isDarkEnoughToSpawn()
 	int xt = Mth::floor(x);
 	int yt = Mth::floor(bb.y0);
 	int zt = Mth::floor(z);
-	if (level->getBrightness(LightLayer::Sky, xt, yt, zt) > random.nextInt(32)) return false;
+	if (level->getLevelData()->getWorldType() != WorldType::Sky
+		&& level->getBrightness(LightLayer::Sky, xt, yt, zt) > random.nextInt(32)) return false;
 
 	int br = level->getRawBrightness(xt, yt, zt);
 

@@ -26,6 +26,7 @@ public:
 
 	int getData(int x, int y, int z);
 	const Material* getMaterial(int x, int y, int z);
+	BiomeSource* getBiomeSource();
 	Biome* getBiome(int x, int z);
 private:
     int xc1, zc1;

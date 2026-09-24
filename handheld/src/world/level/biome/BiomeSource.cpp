@@ -69,11 +69,14 @@ Biome* BiomeSource::getBiome( int x, int z )
 	return getBiomeBlock(x, z, 1, 1)[0];
 }
 
-//float BiomeSource::getTemperature( int x, int z )
-//{
-//	temperatures = temperatureMap->getRegion(temperatures, x, z, 1, 1, tempScale, tempScale, 0.5f);
-//	return temperatures[0];
-//}
+float BiomeSource::getTemperature(int x, int z) {
+	// This is intentionally the direct 0.5-offset noise sample used by
+	// Java Beta World.getSkyColor, not getTemperatureBlock's biome-adjusted
+	// climate value.
+	temperatures = temperatureMap->getRegion(temperatures, x, z, 1, 1,
+		tempScale, tempScale, 0.5f);
+	return temperatures[0];
+}
 
 Biome** BiomeSource::getBiomeBlock( int x, int z, int w, int h )
 {

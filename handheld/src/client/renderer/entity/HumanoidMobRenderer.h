@@ -18,8 +18,7 @@ public:
 	void render(Entity* mob_, float x, float y, float z, float rot, float a);
 protected:
     void additionalRendering(Mob* mob, float a);
-
-private:
+	// Kept protected for PlayerRenderer's 64x64/64x32 skin-layout switch.
 	HumanoidModel* humanoidModel;
 };
 

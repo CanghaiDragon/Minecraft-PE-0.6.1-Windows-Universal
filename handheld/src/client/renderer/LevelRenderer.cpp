@@ -6,6 +6,7 @@
 #include "TileRenderer.h"
 #include "../Minecraft.h"
 #include "../../util/Mth.h"
+#include "../../world/level/Level.h"
 #include "../../world/entity/player/Player.h"
 #include "../../world/level/tile/LevelEvent.h"
 #include "../../world/level/tile/LeafTile.h"
@@ -80,7 +81,9 @@ LevelRenderer::LevelRenderer( Minecraft* mc)
 	chunkBuffers = new GLuint[numListsOrBuffers];
 	glGenBuffers2(numListsOrBuffers, chunkBuffers);
 	LOGI("numBuffers: %d\n", numListsOrBuffers);
-#   if defined(OPENGL_ES) || defined(MACOS) || defined(LINUX)
+#   if defined(OPENGL_ES) || defined(MACOS) || defined(LINUX) || defined(WIN32_WGL)
+	// The desktop WGL backend uses the same fixed-function VBO path as the
+	// other desktop renderers, so it needs the generated sky plane as well.
 	glGenBuffers2(1, &skyBuffer);
 	generateSky();
 #   endif
@@ -100,7 +103,7 @@ LevelRenderer::~LevelRenderer()
 
 #ifdef USE_VBO
 	glDeleteBuffers(numListsOrBuffers, chunkBuffers);
-#   if defined(OPENGL_ES) || defined(MACOS) || defined(LINUX)
+#   if defined(OPENGL_ES) || defined(MACOS) || defined(LINUX) || defined(WIN32_WGL)
 	glDeleteBuffers(1, &skyBuffer);
 #   endif
 	delete[] chunkBuffers;
@@ -159,6 +162,9 @@ void LevelRenderer::setLevel( Level* level )
 
 void LevelRenderer::allChanged()
 {
+	// Terrain tint is baked into chunk meshes, therefore update the shared
+	// tile presentation flag immediately before scheduling their rebuild.
+	Tile::setBetaVisuals(mc->options.betaVisuals);
 	deleteChunks();
 
 #ifdef USE_VBO
@@ -277,6 +283,17 @@ void LevelRenderer::resortChunks( int xc, int yc, int zc )
 	xc -= CHUNK_SIZE / 2;
 	//yc -= CHUNK_SIZE / 2;
 	zc -= CHUNK_SIZE / 2;
+	// Keep the fixed-size chunk ring biased toward the direction the camera is
+	// facing.  This gives every view-distance tier an extra two chunks (32
+	// blocks) in front of the player without increasing the VBO pool or the
+	// total number of loaded chunks.  The shortened rear edge is already
+	// hidden by fog and is not part of the forward view.
+	if (mc->cameraTargetPlayer != NULL) {
+		const Vec3 look = mc->cameraTargetPlayer->getViewVector(1.0f);
+		const int forwardBlocks = CHUNK_SIZE * 2;
+		xc += (int)(look.x * forwardBlocks);
+		zc += (int)(look.z * forwardBlocks);
+	}
 	xMinChunk = INT_MAX;
 	yMinChunk = INT_MAX;
 	zMinChunk = INT_MAX;
@@ -952,10 +969,51 @@ void LevelRenderer::renderSky(float alpha) {
     glEnable2(GL_FOG);
     glColor4f2(sr, sg, sb, 1.0f);
 
-#if defined(OPENGL_ES) || defined(MACOS) || defined(LINUX)
+#if defined(OPENGL_ES) || defined(MACOS) || defined(LINUX) || defined(WIN32_WGL)
 	drawArrayVT(skyBuffer, skyVertexCount);
 #endif
     glEnable2(GL_TEXTURE_2D);
+}
+
+void LevelRenderer::renderBetaSky(float alpha) {
+	if (mc->level->dimension->foggy) return;
+	glDisable2(GL_TEXTURE_2D);
+	Vec3 sc = level->getBetaSkyColor(mc->cameraTargetPlayer, alpha);
+	glColor4f2(sc.x, sc.y, sc.z, 1.0f);
+	glEnable2(GL_FOG);
+#if defined(OPENGL_ES) || defined(MACOS) || defined(LINUX) || defined(WIN32_WGL)
+	drawArrayVT(skyBuffer, skyVertexCount);
+#endif
+
+	// Matches Beta's rotating celestial layers.  These two images are the
+	// original Beta terrain/sun.png and terrain/moon.png assets.
+	glDisable2(GL_FOG);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	// Binding a texture does not enable GL_TEXTURE_2D.  The sky plane above
+	// intentionally disabled it, so enable it again before the sun/moon batch.
+	glEnable2(GL_TEXTURE_2D);
+	glPushMatrix2();
+	glRotatef2(level->getSunAngle(alpha) * Mth::RADDEG, 1, 0, 0);
+	Tesselator& t = Tesselator::instance;
+	textures->loadAndBindTexture("terrain/sun.png");
+	t.begin();
+	t.color(1.0f, 1.0f, 1.0f, 1.0f);
+	t.vertexUV(-30, 100, -30, 0, 0); t.vertexUV(30, 100, -30, 1, 0);
+	t.vertexUV(30, 100, 30, 1, 1); t.vertexUV(-30, 100, 30, 0, 1);
+	t.endOverrideAndDraw();
+	if (level->getLevelData()->getWorldType() != WorldType::Sky) {
+		textures->loadAndBindTexture("terrain/moon.png");
+		t.begin();
+		t.color(1.0f, 1.0f, 1.0f, 1.0f);
+		t.vertexUV(-20, -100, 20, 1, 1); t.vertexUV(20, -100, 20, 0, 1);
+		t.vertexUV(20, -100, -20, 0, 0); t.vertexUV(-20, -100, -20, 1, 0);
+		t.endOverrideAndDraw();
+	}
+	glPopMatrix2();
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_BLEND);
+	glEnable2(GL_TEXTURE_2D);
 }
 
 void LevelRenderer::renderClouds( float alpha ) {
@@ -988,7 +1046,8 @@ void LevelRenderer::renderClouds( float alpha ) {
 	xo -= xOffs * 2048;
 	zo -= zOffs * 2048;
 
-	float yy = /*level.dimension.getCloudHeight()*/ 128 - yOffs + 0.33f;//mc->player->y + 1;
+	float cloudHeight = level->getLevelData()->getWorldType() == WorldType::Sky ? 9.0f : 128.0f;
+	float yy = cloudHeight - yOffs + 0.33f;//mc->player->y + 1;
 	float uo = (float) (xo * scale);
 	float vo = (float) (zo * scale);
 	t.begin();
@@ -1004,6 +1063,67 @@ void LevelRenderer::renderClouds( float alpha ) {
 	}
 	t.endOverrideAndDraw();
 	glColor4f(1, 1, 1, 1.0f);
+	glDisable(GL_BLEND);
+	glEnable(GL_CULL_FACE);
+}
+
+void LevelRenderer::renderBetaClouds(float alpha) {
+	// Ported from Beta 1.7.3 RenderGlobal.renderCloudsFancy.  The important
+	// detail is that UV coordinates are in the unscaled 8x8 cloud grid, while
+	// positions are scaled to 12 world units.  Using world coordinates as UVs
+	// was the source of the stretched/repeated cloud artefacts.
+	glEnable2(GL_TEXTURE_2D);
+	glDisable(GL_CULL_FACE);
+	textures->loadAndBindTexture("environment/clouds.png");
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	Vec3 cc = level->getCloudColor(alpha);
+	float time = ticks + alpha;
+	float xo = (mc->player->xo + (mc->player->x - mc->player->xo) * alpha + time * 0.03f) / 12.0f;
+	float zo = (mc->player->zo + (mc->player->z - mc->player->zo) * alpha) / 12.0f + 0.33f;
+	const float cloudHeight = level->getLevelData()->getWorldType() == WorldType::Sky ? 9.0f : 108.0f;
+	const float cloudY = cloudHeight - (mc->player->yOld + (mc->player->y - mc->player->yOld) * alpha) + 0.33f;
+	const float uv = 1.0f / 256.0f, tile = 8.0f, scale = 12.0f;
+	float uOffset = (float)Mth::floor(xo) * uv;
+	float vOffset = (float)Mth::floor(zo) * uv;
+	float xFraction = xo - Mth::floor(xo);
+	float zFraction = zo - Mth::floor(zo);
+	Tesselator& t = Tesselator::instance;
+	for (int pass = 0; pass < 2; ++pass) {
+		glColorMask(pass != 0, pass != 0, pass != 0, pass != 0);
+	for (int gx = -2; gx <= 3; ++gx) for (int gz = -2; gz <= 3; ++gz) {
+		const float height = 4.0f;
+		float gridX = gx * tile, gridZ = gz * tile;
+		float x0 = (gridX - xFraction) * scale, z0 = (gridZ - zFraction) * scale;
+		float x1 = x0 + tile * scale, z1 = z0 + tile * scale;
+		float u0 = gridX * uv + uOffset, v0 = gridZ * uv + vOffset;
+		float u1 = (gridX + tile) * uv + uOffset, v1 = (gridZ + tile) * uv + vOffset;
+		t.begin();
+		if (cloudY > -height - 1.0f) {
+			t.color((float)cc.x * 0.7f, (float)cc.y * 0.7f, (float)cc.z * 0.7f, 0.8f);
+			t.vertexUV(x0,cloudY,z1,u0,v1); t.vertexUV(x1,cloudY,z1,u1,v1); t.vertexUV(x1,cloudY,z0,u1,v0); t.vertexUV(x0,cloudY,z0,u0,v0);
+		}
+		if (cloudY <= height + 1.0f) {
+			t.color((float)cc.x, (float)cc.y, (float)cc.z, 0.8f);
+			t.vertexUV(x0,cloudY+height,z1,u0,v1); t.vertexUV(x1,cloudY+height,z1,u1,v1); t.vertexUV(x1,cloudY+height,z0,u1,v0); t.vertexUV(x0,cloudY+height,z0,u0,v0);
+		}
+		// Reference port's per-unit vertical faces.  The depth-only first pass
+		// resolves transparent cloud ordering before the colour pass.
+		t.color((float)cc.x * 0.8f, (float)cc.y * 0.8f, (float)cc.z * 0.8f, 0.8f);
+		if (gx > -1) for (int i = 0; i < 8; ++i) { float x = x0 + i * scale, u = (gridX+i+0.5f)*uv+uOffset;
+			t.vertexUV(x,cloudY,z1,u,v1); t.vertexUV(x,cloudY+height,z1,u,v1); t.vertexUV(x,cloudY+height,z0,u,v0); t.vertexUV(x,cloudY,z0,u,v0); }
+		if (gx <= 1) for (int i = 0; i < 8; ++i) { float x = x0 + (i+1)*scale - 1.0f/1024.0f, u = (gridX+i+0.5f)*uv+uOffset;
+			t.vertexUV(x,cloudY,z1,u,v1); t.vertexUV(x,cloudY+height,z1,u,v1); t.vertexUV(x,cloudY+height,z0,u,v0); t.vertexUV(x,cloudY,z0,u,v0); }
+		t.color((float)cc.x * 0.8f, (float)cc.y * 0.8f, (float)cc.z * 0.8f, 0.8f);
+		if (gz > -1) for (int i = 0; i < 8; ++i) { float z = z0+i*scale, v=(gridZ+i+0.5f)*uv+vOffset;
+			t.vertexUV(x0,cloudY+height,z,u0,v); t.vertexUV(x1,cloudY+height,z,u1,v); t.vertexUV(x1,cloudY,z,u1,v); t.vertexUV(x0,cloudY,z,u0,v); }
+		if (gz <= 1) for (int i = 0; i < 8; ++i) { float z = z0+(i+1)*scale-1.0f/1024.0f, v=(gridZ+i+0.5f)*uv+vOffset;
+			t.vertexUV(x0,cloudY+height,z,u0,v); t.vertexUV(x1,cloudY+height,z,u1,v); t.vertexUV(x1,cloudY,z,u1,v); t.vertexUV(x0,cloudY,z,u0,v); }
+		t.endOverrideAndDraw();
+	}
+	}
+	glColorMask(true, true, true, true);
+	glColor4f(1, 1, 1, 1);
 	glDisable(GL_BLEND);
 	glEnable(GL_CULL_FACE);
 }

@@ -25,9 +25,9 @@ LevelData::LevelData( const LevelSettings& settings, const std::string& levelNam
 	gameType(settings.getGameType()),
 	worldType(settings.getWorldType()),
 	levelName(levelName),
-	xSpawn(settings.getWorldType() == WorldType::Infinite ? 0 : 128),
+	xSpawn((settings.getWorldType() == WorldType::Infinite || settings.getWorldType() == WorldType::Sky) ? 0 : 128),
 	ySpawn(64),
-	zSpawn(settings.getWorldType() == WorldType::Infinite ? 0 : 128),
+	zSpawn((settings.getWorldType() == WorldType::Infinite || settings.getWorldType() == WorldType::Sky) ? 0 : 128),
 	lastPlayed(0),
 	time(0),
 	dimension(Dimension::NORMAL),
@@ -381,5 +381,5 @@ void LevelData::setWorldType( int type )
 
 bool LevelData::isInfinite() const
 {
-	return worldType == WorldType::Infinite;
+	return worldType == WorldType::Infinite || worldType == WorldType::Sky;
 }

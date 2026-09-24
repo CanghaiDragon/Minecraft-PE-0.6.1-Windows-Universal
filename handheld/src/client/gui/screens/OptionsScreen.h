@@ -6,6 +6,7 @@
 
 class ImageButton;
 class OptionsPane;
+class TextBox;
 
 class OptionsScreen: public Screen
 {
@@ -27,12 +28,16 @@ public:
 	virtual void mouseReleased( int x, int y, int buttonNum );
 	virtual void mouseScrolled(int x, int y, int delta);
 	virtual void tick();
+	virtual void keyPressed(int eventKey);
+	virtual void keyboardNewChar(char inputChar);
 private:
+	void saveUsername();
 	Touch::THeader* bHeader;
 	ImageButton* btnClose;
 	std::vector<Touch::TButton*> categoryButtons;
 	std::vector<OptionsPane*> optionPanes;
 	OptionsPane* currentOptionPane;
+	TextBox* usernameBox;
 	int selectedCategory;
 
 	// Sidebar scroll state

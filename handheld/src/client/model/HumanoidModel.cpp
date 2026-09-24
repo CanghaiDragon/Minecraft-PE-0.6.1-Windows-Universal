@@ -4,51 +4,77 @@
 #include "../../world/entity/player/Player.h"
 #include "../../world/entity/player/Inventory.h"
 
-HumanoidModel::HumanoidModel( float g /*= 0*/, float yOffset /*= 0*/ )
+HumanoidModel::HumanoidModel( float g /*= 0*/, float yOffset /*= 0*/, int texW /*= 64*/, int texH /*= 32*/, bool slimArms /*= false*/ )
 :	holdingLeftHand(false),
 	holdingRightHand(false),
 	sneaking(false),
 	bowAndArrow(false),
+	slimArms(slimArms),
 	head(0, 0),
+	hair(32, 0),
 	//ear (24, 0),
-	//hair(32, 0),
 	body(16, 16),
 	arm0(24 + 16, 16),
 	arm1(24 + 16, 16),
 	leg0(0, 16),
 	leg1(0, 16)
 {
+	texWidth = texW;
+	texHeight = texH;
 	head.setModel(this);
+	hair.setModel(this);
 	body.setModel(this);
 	arm0.setModel(this);
 	arm1.setModel(this);
 	leg0.setModel(this);
 	leg1.setModel(this);
 
+	const bool modernSkin = texWidth == 64 && texHeight == 64;
+	if (modernSkin) {
+		// Modern skins keep the left limbs in the lower half.  Geometry remains
+		// the classic 4-pixel-wide arm model; slim arms are intentionally absent.
+		arm1.texOffs(32, 48);
+		leg1.texOffs(16, 48);
+	}
+
 	head.addBox(-4, -8, -4, 8, 8, 8, g); // Head
 	head.setPos(0, 0 + yOffset, 0);
 
 	//ear.addBox(-3, -6, -1, 6, 6, 1, g); // Ear
 
-	//hair.addBox(-4, -8, -4, 8, 8, 8, g + 0.5f); // Head
-	//      hair.setPos(0, 0 + yOffset, 0);
+	hair.addBox(-4, -8, -4, 8, 8, 8, g + 0.5f); // Outer head layer (hat)
+	hair.setPos(0, 0 + yOffset, 0);
 
 	body.addBox(-4, 0, -2, 8, 12, 4, g); // Body
 	body.setPos(0, 0 + yOffset, 0);
 
-	arm0.addBox(-3, -2, -2, 4, 12, 4, g); // Arm0
-	arm0.setPos(-5, 2 + yOffset, 0);
+	const int armWidth = (modernSkin && slimArms) ? 3 : 4;
+	arm0.addBox(-3, -2, -2, armWidth, 12, 4, g); // Right arm
+	// With the old PE cube rasterizer, merely sharing an edge still leaves a
+	// visible seam.  Let slim arms overlap the torso by one model pixel.
+	arm0.setPos((modernSkin && slimArms) ? -4.25f : -5, 2 + yOffset, 0);
 
-	arm1.mirror = true;
-	arm1.addBox(-1, -2, -2, 4, 12, 4, g); // Arm1
-	arm1.setPos(5, 2 + yOffset, 0);
+	// Modern skins have their own left-arm UV island.  PE's mirror operation
+	// flips that artwork, so retain it only for the legacy 64x32 layout.
+	arm1.mirror = !modernSkin;
+	arm1.addBox(slimArms && modernSkin ? 0 : -1, -2, -2, armWidth, 12, 4, g); // Left arm
+	arm1.setPos((modernSkin && slimArms) ? 4.25f : 5, 2 + yOffset, 0);
 
 	leg0.addBox(-2, 0, -2, 4, 12, 4, g); // Leg0
 	leg0.setPos(-2, 12 + yOffset, 0);
 
-	leg1.mirror = true;
+	leg1.mirror = !modernSkin;
 	leg1.addBox(-2, 0, -2, 4, 12, 4, g); // Leg1
 	leg1.setPos(2, 12 + yOffset, 0);
+
+	if (modernSkin) {
+		// Keep the standard model dimensions, but add the normal 64x64 outer layers.
+		body.texOffs(16, 32); body.addBox(-4, 0, -2, 8, 12, 4, g + .5f);
+		arm0.texOffs(40, 32); arm0.addBox(-3, -2, -2, armWidth, 12, 4, g + .5f);
+		arm1.texOffs(48, 48); arm1.addBox(slimArms ? 0 : -1, -2, -2, armWidth, 12, 4, g + .5f);
+		leg0.texOffs(0, 32);  leg0.addBox(-2, 0, -2, 4, 12, 4, g + .5f);
+		leg1.texOffs(0, 48);  leg1.addBox(-2, 0, -2, 4, 12, 4, g + .5f);
+	}
 }
 
 void HumanoidModel::render(Entity* e, float time, float r, float bob, float yRot, float xRot, float scale )
@@ -67,8 +93,15 @@ void HumanoidModel::render(Entity* e, float time, float r, float bob, float yRot
 	}
 	
 	setupAnim(time, r, bob, yRot, xRot, scale);
+
+	// The outer head layer must follow the base head exactly.
+	hair.xRot = head.xRot;
+	hair.yRot = head.yRot;
+	hair.zRot = head.zRot;
+	hair.y = head.y;
 	
 	head.render(scale);
+	if (texWidth == 64 && texHeight == 64) hair.render(scale);
 	body.render(scale);
 	arm0.render(scale);
 	arm1.render(scale);
@@ -83,8 +116,10 @@ void HumanoidModel::render( HumanoidModel* model, float scale )
 	head.yRot = model->head.yRot;
 	head.y = model->head.y;
 	head.xRot = model->head.xRot;
-	//hair.yRot = head.yRot;
-	//hair.xRot = head.xRot;
+	hair.yRot = head.yRot;
+	hair.xRot = head.xRot;
+	hair.zRot = head.zRot;
+	hair.y = head.y;
 
 	arm0.xRot = model->arm0.xRot;
 	arm0.zRot = model->arm0.zRot;
@@ -96,6 +131,7 @@ void HumanoidModel::render( HumanoidModel* model, float scale )
 	leg1.xRot = model->leg1.xRot;
 
 	head.render(scale);
+	if (texWidth == 64 && texHeight == 64) hair.render(scale);
 	body.render(scale);
 	arm0.render(scale);
 	arm1.render(scale);
@@ -152,12 +188,13 @@ void HumanoidModel::setupAnim( float time, float r, float bob, float yRot, float
 	arm1.yRot = 0;
 
 	if (attackTime > -9990) {
+		const float armPivot = (texWidth == 64 && texHeight == 64 && slimArms) ? 4.25f : 5.0f;
 		float swing = attackTime;
 		body.yRot = Mth::sin(Mth::sqrt(swing) * Mth::PI * 2) * 0.2f;
-		arm0.z = Mth::sin(body.yRot) * 5;
-		arm0.x = -Mth::cos(body.yRot) * 5;
-		arm1.z = -Mth::sin(body.yRot) * 5;
-		arm1.x = Mth::cos(body.yRot) * 5;
+		arm0.z = Mth::sin(body.yRot) * armPivot;
+		arm0.x = -Mth::cos(body.yRot) * armPivot;
+		arm1.z = -Mth::sin(body.yRot) * armPivot;
+		arm1.x = Mth::cos(body.yRot) * armPivot;
 		arm0.yRot += body.yRot;
 		arm1.yRot += body.yRot;
 		arm1.xRot += body.yRot;
@@ -227,7 +264,7 @@ void HumanoidModel::onGraphicsReset()
 	arm1.onGraphicsReset();
 	leg0.onGraphicsReset();
 	leg1.onGraphicsReset();
-	//hair.onGraphicsReset();
+	hair.onGraphicsReset();
 }
 
 //void renderHair(float scale) {

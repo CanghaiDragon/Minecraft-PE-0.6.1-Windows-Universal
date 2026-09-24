@@ -31,7 +31,9 @@ public:
     virtual Biome* getBiome(const ChunkPos& chunk);
     virtual Biome* getBiome(int x, int z);
 
-    //virtual float getTemperature(int x, int z);
+	// Java Beta's sky colour samples this raw climate field directly, rather
+	// than the adjusted temperature array populated by getBiomeBlock().
+	virtual float getTemperature(int x, int z);
 
 	// Note: The arrays returned here are temporary in the meaning that their
 	//       contents might change in the future. If you need to SAVE the

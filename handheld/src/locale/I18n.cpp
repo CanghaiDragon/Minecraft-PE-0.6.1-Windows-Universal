@@ -37,8 +37,8 @@ std::string I18n::get( const std::string& id )
 	// readable until that data folder is refreshed.
 	struct FallbackText { const char* id; const char* text; };
 	static const FallbackText fallbackTexts[] = {
-		{ "options.category.extraContent", "Additional Content" },
-		{ "options.infiniteWorlds", "Infinite Worlds" },
+		{ "options.category.additional", "Additional" },
+		{ "options.extraWorldType", "Extra World Type" },
 		{ "options.inputMode", "Input Mode" },
 		{ "options.inputMode.keyboardMouse", "Keyboard & Mouse" },
 		{ "options.inputMode.touch", "Touch" },
@@ -46,7 +46,17 @@ std::string I18n::get( const std::string& id )
 		{ "options.dpadSize.small", "Small" },
 		{ "options.dpadSize.normal", "Normal" },
 		{ "options.dpadSize.large", "Large" },
-		{ "options.guiScale.medium", "Medium" }
+		{ "options.guiScale.medium", "Medium" },
+		{ "options.betaVisuals", "Java Beta Graphic Visual" },
+		{ "options.category.skin", "Skin" },
+		{ "options.skinMenu", "Skin Settings" },
+		{ "options.importSkin", "Import Skin" },
+		{ "options.touchSneak", "Touch Sneak" },
+		{ "options.debugScreen", "Debug Screen F3" },
+		{ "options.skinArmType", "Arm Type" },
+		{ "options.skinArmType.classic", "Classic" },
+		{ "options.skinArmType.slim", "Slim" },
+		{ "options.clearSkinCache", "Clear Skin Cache" }
 	};
 	for (unsigned int i = 0; i < sizeof(fallbackTexts) / sizeof(fallbackTexts[0]); ++i)
 		if (id == fallbackTexts[i].id)

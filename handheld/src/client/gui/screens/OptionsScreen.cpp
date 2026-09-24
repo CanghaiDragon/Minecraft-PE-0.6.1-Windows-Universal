@@ -9,6 +9,7 @@
 #include "../components/OptionsPane.h"
 #include "../components/ImageButton.h"
 #include "../components/OptionsGroup.h"
+#include "../components/TextBox.h"
 #include "../Gui.h"
 #include "../../renderer/gles.h"
 #include "../../../platform/input/Mouse.h"
@@ -17,6 +18,7 @@ OptionsScreen::OptionsScreen()
 : btnClose(NULL),
   bHeader(NULL),
   currentOptionPane(NULL),
+  usernameBox(NULL),
   selectedCategory(0),
   _catScrollY(0),
   _catScrollVelocity(0),
@@ -65,13 +67,16 @@ void OptionsScreen::init() {
 	def.setSrc(IntRectangle(150, 0, (int)def.width, (int)def.height));
 	btnClose->setImageDef(def, true);
 
-	// Wider category buttons for desktop readability
+	// Category order follows Options.md.  Audio sits directly above Additional.
 	Touch::TButton* b;
-	b = new Touch::TButton(2, I18n::get("options.category.audio"));    b->width = 80; b->height = 28; categoryButtons.push_back(b);
-	b = new Touch::TButton(3, I18n::get("options.category.game"));     b->width = 80; b->height = 28; categoryButtons.push_back(b);
-	b = new Touch::TButton(4, I18n::get("options.category.controls")); b->width = 80; b->height = 28; categoryButtons.push_back(b);
-	b = new Touch::TButton(5, I18n::get("options.category.graphics")); b->width = 80; b->height = 28; categoryButtons.push_back(b);
-	b = new Touch::TButton(6, I18n::get("options.category.extraContent")); b->width = 80; b->height = 28; categoryButtons.push_back(b);
+	b = new Touch::TButton(2, I18n::get("options.category.game"));       b->width = 80; b->height = 28; categoryButtons.push_back(b);
+	b = new Touch::TButton(3, I18n::get("options.category.controls"));   b->width = 80; b->height = 28; categoryButtons.push_back(b);
+	b = new Touch::TButton(4, I18n::get("options.category.graphics"));   b->width = 80; b->height = 28; categoryButtons.push_back(b);
+	b = new Touch::TButton(5, I18n::get("options.category.audio"));      b->width = 80; b->height = 28; categoryButtons.push_back(b);
+	b = new Touch::TButton(6, I18n::get("options.category.additional")); b->width = 80; b->height = 28; categoryButtons.push_back(b);
+	if (minecraft->options.skinMenu) {
+		b = new Touch::TButton(7, I18n::get("options.category.skin"));       b->width = 80; b->height = 28; categoryButtons.push_back(b);
+	}
 	buttons.push_back(bHeader);
 	buttons.push_back(btnClose);
 	for(std::vector<Touch::TButton*>::iterator it = categoryButtons.begin(); it != categoryButtons.end(); ++it) {
@@ -164,21 +169,31 @@ void OptionsScreen::render( int xm, int ym, float a ) {
 
 	glDisable2(GL_SCISSOR_TEST);
 
-	// Content pane (outside scissor)
-	int xmm = xm * width / minecraft->width;
-	int ymm = ym * height / minecraft->height - 1;
+	// GameRenderer already gives Screen coordinates in GUI units.  Applying a
+	// second conversion here made option-row hover tests miss at non-1x GUI
+	// scales, even though the click path used the right coordinates.
 	if(currentOptionPane != NULL)
-		currentOptionPane->render(minecraft, xmm, ymm);
+		currentOptionPane->render(minecraft, xm, ym);
 }
 
 void OptionsScreen::removed()
 {
+	saveUsername();
+}
+
+void OptionsScreen::saveUsername()
+{
+	if (usernameBox == NULL || usernameBox->text == minecraft->options.username)
+		return;
+	minecraft->options.username = usernameBox->text;
+	minecraft->options.save();
 }
 void OptionsScreen::buttonClicked( Button* button ) {
 	if(button == btnClose) {
+		saveUsername();
 		minecraft->reloadOptions();
 		minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
-	} else if(button->id > 1 && button->id < 7) {
+	} else if(button->id > 1 && button->id < 8) {
 		// This is a category button
 		int categoryButton = button->id - categoryButtons[0]->id;
 		selectCategory(categoryButton);
@@ -205,40 +220,54 @@ void OptionsScreen::generateOptionScreens() {
 	optionPanes.push_back(new OptionsPane());
 	optionPanes.push_back(new OptionsPane());
 	optionPanes.push_back(new OptionsPane());
-	// Audio
-	optionPanes[0]->createOptionsGroup("options.group.audio")
-		.addOptionItem(&Options::Option::MUSIC, minecraft)
-		.addOptionItem(&Options::Option::SOUND, minecraft);
-
+	optionPanes.push_back(new OptionsPane());
 	// Game
-	optionPanes[1]->createOptionsGroup("options.group.game")
-		.addOptionItem(&Options::Option::DIFFICULTY, minecraft)
+	OptionsGroup& gameGroup = optionPanes[0]->createOptionsGroup("options.group.game");
+	usernameBox = gameGroup.addTextInput("Username", "Username", minecraft->options.username);
+	gameGroup.addOptionItem(&Options::Option::DIFFICULTY, minecraft)
 		.addOptionItem(&Options::Option::THIRD_PERSON, minecraft)
-		.addOptionItem(&Options::Option::HIDE_GUI, minecraft)
 		.addOptionItem(&Options::Option::SERVER_VISIBLE, minecraft);
 
 	// Controls
-	optionPanes[2]->createOptionsGroup("options.group.controls")
+	OptionsGroup& controlsGroup = optionPanes[1]->createOptionsGroup("options.group.controls");
+	controlsGroup
 		.addOptionItem(&Options::Option::INPUT_MODE, minecraft)
 		.addOptionItem(&Options::Option::SENSITIVITY, minecraft)
-		.addOptionItem(&Options::Option::INVERT_MOUSE, minecraft)
+		.addOptionItem(&Options::Option::DPAD_SIZE, minecraft)
 		.addOptionItem(&Options::Option::LEFT_HANDED, minecraft)
 		.addOptionItem(&Options::Option::USE_TOUCH_JOYPAD, minecraft)
-		.addOptionItem(&Options::Option::DPAD_SIZE, minecraft)
-		.addOptionItem(&Options::Option::DESTROY_VIBRATION, minecraft);
+		.addDisabledItem("Vibrate on Destroy", "Unavailable")
+		.addOptionItem(&Options::Option::INVERT_MOUSE, minecraft);
 
 	// Graphics
-	optionPanes[3]->createOptionsGroup("options.group.graphics")
+	optionPanes[2]->createOptionsGroup("options.group.graphics")
 		.addOptionItem(&Options::Option::GRAPHICS, minecraft)
 		.addOptionItem(&Options::Option::AMBIENT_OCCLUSION, minecraft)
 		.addOptionItem(&Options::Option::RENDER_DISTANCE, minecraft)
 		.addOptionItem(&Options::Option::GUI_SCALE, minecraft)
 		.addOptionItem(&Options::Option::VIEW_BOBBING, minecraft)
-		.addOptionItem(&Options::Option::FOV, minecraft);
+		.addOptionItem(&Options::Option::FOV, minecraft)
+		.addOptionItem(&Options::Option::HIDE_GUI, minecraft);
 
-	// Additional Content: opt-in features that are not part of PE 0.6.1.
-	optionPanes[4]->createOptionsGroup("options.category.extraContent")
-		.addOptionItem(&Options::Option::INFINITE_WORLDS, minecraft);
+	// Audio
+	optionPanes[3]->createOptionsGroup("options.group.audio")
+		.addOptionItem(&Options::Option::MUSIC, minecraft)
+		.addOptionItem(&Options::Option::SOUND, minecraft);
+
+	// Additional: opt-in features and clearly marked future placeholders.
+	optionPanes[4]->createOptionsGroup("options.category.additional")
+		.addOptionItem(&Options::Option::INFINITE_WORLDS, minecraft)
+		.addOptionItem(&Options::Option::SKIN_MENU, minecraft)
+		.addOptionItem(&Options::Option::TOUCH_SNEAK, minecraft)
+		.addOptionItem(&Options::Option::BETA_VISUALS, minecraft)
+		.addOptionItem(&Options::Option::DEBUG_SCREEN, minecraft)
+		.addDisabledItem("Chinese", "Coming soon");
+
+	// Skin: choose the model explicitly; imported skins are always 64x64.
+	optionPanes[5]->createOptionsGroup("options.category.skin")
+		.addOptionItem(&Options::Option::SKIN_ARM_TYPE, minecraft)
+		.addImportSkinItem(minecraft)
+		.addClearSkinCacheItem(minecraft);
 // 	int mojangGroup = optionPanes[0]->createOptionsGroup("Mojang");
 // 	static const int arr[] = {5,4,3,15};
 // 	std::vector<int> vec (arr, arr + sizeof(arr) / sizeof(arr[0]) );
@@ -317,6 +346,19 @@ void OptionsScreen::mouseScrolled(int x, int y, int delta) {
 	} else if (currentOptionPane != NULL) {
 		currentOptionPane->mouseScrolled(delta);
 	}
+}
+
+void OptionsScreen::keyPressed(int eventKey)
+{
+	if (usernameBox != NULL)
+		usernameBox->keyPressed(minecraft, eventKey);
+	super::keyPressed(eventKey);
+}
+
+void OptionsScreen::keyboardNewChar(char inputChar)
+{
+	if (usernameBox != NULL)
+		usernameBox->charPressed(minecraft, inputChar);
 }
 
 void OptionsScreen::tick() {

@@ -16,6 +16,7 @@ public:
     static const char* Graphics_GuiScale;
     static const char* Graphics_ViewBobbing;
     static const char* Graphics_FOV;
+	static const char* Graphics_BetaVisuals;
     
     static const char* Controls_Sensitivity;
     static const char* Controls_InvertMouse;
@@ -29,6 +30,10 @@ public:
     static const char* Game_ThirdPerson;
 	static const char* Game_HideGui;
 	static const char* Extra_InfiniteWorlds;
+	static const char* Skin_ArmType;
+	static const char* Skin_Menu;
+	static const char* Touch_Sneak;
+	static const char* Extra_DebugScreen;
 };
 
 #endif /*NET_MINECRAFT_CLIENT__OptionsStrings_H__*/

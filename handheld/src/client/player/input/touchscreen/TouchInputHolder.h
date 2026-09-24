@@ -77,6 +77,7 @@ public:
 		_canDestroy(false),
 		_forceCanUse(false)
 	{
+		_minecraft = minecraft;
 		_area.deleteMe = false;
 		setSensitivity(sensitivity);
 		//((ITurnInput*)this)->onConfigChanged(createConfig(minecraft));
@@ -382,6 +383,11 @@ public:
 		while (Multitouch::next()) {
 			MouseAction& m = Multitouch::getEvent();
 			if (m.action == MouseAction::ACTION_MOVE) continue;
+			// The right-side jump/flight cluster is a control-only area.  Do not
+			// let its taps reach the world build pipeline as block placement.
+			if (_options->touchSneak && m.x > _minecraft->width * 0.85f &&
+				m.y > _minecraft->height * 0.64f)
+				continue;
 
 			int areaId = _model.getPointerId(m.x, m.y, m.pointerId);
 			if (areaId != AREA_TURN) continue;
@@ -428,6 +434,7 @@ public:
     RectangleArea pauseArea;
 
 private:
+	Minecraft* _minecraft;
 	IInputHolder* _holder;
 
 	// Turn

@@ -1,4 +1,9 @@
 #include "Minecraft.h"
+#include "../platform/ExitTrace.h"
+#ifndef STANDALONE_SERVER
+#include "gui/screens/DisconnectionScreen.h"
+#include "gui/screens/WelcomeScreen.h"
+#endif
 #ifdef WIN32
 extern void setWin32TouchInputEnabled(bool enabled);
 extern void setWin32GuiInputEnabled(bool enabled);
@@ -68,6 +73,8 @@ extern void setWin32GuiInputEnabled(bool enabled);
 #ifndef STANDALONE_SERVER
 #include "gui/screens/PrerenderTilesScreen.h"
 #include "renderer/Textures.h"
+#include "../world/level/GrassColor.h"
+#include "../world/level/FoliageColor.h"
 #include "gui/screens/DeathScreen.h"
 #endif
 
@@ -210,46 +217,69 @@ Minecraft::Minecraft()
 
 Minecraft::~Minecraft()
 {
+	MCPE_EXIT_TRACE("Minecraft destructor: begin");
+	MCPE_EXIT_TRACE("Minecraft destructor: delete netCallback");
 	delete netCallback;
+	MCPE_EXIT_TRACE("Minecraft destructor: delete raknetInstance");
 	delete raknetInstance;
 #ifndef STANDALONE_SERVER
+	MCPE_EXIT_TRACE("Minecraft destructor: delete levelRenderer");
 	delete levelRenderer;
+	MCPE_EXIT_TRACE("Minecraft destructor: delete gameRenderer");
 	delete gameRenderer;
+	MCPE_EXIT_TRACE("Minecraft destructor: delete particleEngine");
 	delete particleEngine;
 
+	MCPE_EXIT_TRACE("Minecraft destructor: delete soundEngine");
 	delete soundEngine;
 #endif
+	MCPE_EXIT_TRACE("Minecraft destructor: delete gameMode");
 	delete gameMode;
 #ifndef STANDALONE_SERVER
+	MCPE_EXIT_TRACE("Minecraft destructor: delete font");
 	delete font;
+	MCPE_EXIT_TRACE("Minecraft destructor: delete textures");
 	delete textures;
 
 	if (screen != NULL) {
+		MCPE_EXIT_TRACE("Minecraft destructor: delete screen");
 		delete screen;
 		screen = NULL;
 	}
 #endif
 	if (level != NULL) {
+		MCPE_EXIT_TRACE("Minecraft destructor: save level");
 		level->saveGame();
 		if (level->getChunkSource())
+			MCPE_EXIT_TRACE("Minecraft destructor: save chunks");
+		if (level->getChunkSource())
 			level->getChunkSource()->saveAll(true);
+		MCPE_EXIT_TRACE("Minecraft destructor: delete level storage");
 		delete level->getLevelStorage();
+		MCPE_EXIT_TRACE("Minecraft destructor: delete level");
 		delete level;
 		level = NULL;
 	}
 
 	//delete player;
+	MCPE_EXIT_TRACE("Minecraft destructor: delete user");
 	delete user;
+	MCPE_EXIT_TRACE("Minecraft destructor: delete inputHolder");
 	delete inputHolder;
 
+	MCPE_EXIT_TRACE("Minecraft destructor: delete storageSource");
 	delete storageSource;
+	MCPE_EXIT_TRACE("Minecraft destructor: delete perfRenderer");
 	delete _perfRenderer;
+	MCPE_EXIT_TRACE("Minecraft destructor: delete commandServer");
 	delete _commandServer;
 
+	MCPE_EXIT_TRACE("Minecraft destructor: destroy entity dispatcher");
 	MobFactory::clearStaticTestMobs();
 #ifndef STANDALONE_SERVER
 	EntityRenderDispatcher::destroy();
 #endif
+	MCPE_EXIT_TRACE("Minecraft destructor: complete");
 }
 
 // Only called by server
@@ -319,16 +349,24 @@ void Minecraft::setLevel(Level* level, const std::string& message /* ="" */, Loc
 
 void Minecraft::leaveGame(bool renameLevel /*=false*/)
 {
-    if (isGeneratingLevel || !_hasSignaledGeneratingLevelFinished)
+    // Touch and mouse messages can both reach the pause button on Windows.
+    // Once teardown has started, ignore the duplicate event instead of
+    // entering the cleanup path a second time.
+    if (!_running || level == NULL || isGeneratingLevel || !_hasSignaledGeneratingLevelFinished)
         return;
-    
+
+	LOGI("leaveGame: begin rename=%d\n", renameLevel ? 1 : 0);
 	isGeneratingLevel = false;
 	bool saveLevel = level && (!level->isClientSide || renameLevel);
 
-	raknetInstance->disconnect();
+	LOGI("leaveGame: disconnect\n");
+	if (raknetInstance)
+		raknetInstance->disconnect();
 	if (saveLevel) {
 		// If server or wanting to save level as client, save all unsaved chunks!
+		LOGI("leaveGame: save chunks begin\n");
 		level->getChunkSource()->saveAll(true);
+		LOGI("leaveGame: save chunks end\n");
 	}
 
 	LOGI("Clearing levels\n");
@@ -338,6 +376,7 @@ void Minecraft::leaveGame(bool renameLevel /*=false*/)
 	levelRenderer->setLevel(NULL);
 	particleEngine->setLevel(NULL);
 #endif
+	LOGI("leaveGame: release callback and level\n");
 	LOGI("Erasing callback\n");
 	delete netCallback;
 	netCallback = NULL;
@@ -353,6 +392,7 @@ void Minecraft::leaveGame(bool renameLevel /*=false*/)
 	cameraTargetPlayer = NULL;
 
 	_running = false;
+	LOGI("leaveGame: cleanup complete\n");
 #ifndef STANDALONE_SERVER
 	if (renameLevel) {
 		setScreen(new RenameMPLevelScreen(LevelStorageSource::TempLevelId));
@@ -418,6 +458,8 @@ void Minecraft::prepareLevel(const std::string& title) {
 	progressStageStatusId = 3;
 	if (level->isNew()) {
 		level->setInitialSpawn(); // @note: should obviously be called from Level itself
+		if (level->getLevelData()->getWorldType() == WorldType::Sky
+			&& level->getSharedSpawnPos().y < 0) return;
 		level->saveLevelData();
 		level->getChunkSource()->saveAll(false);
 		level->saveGame();
@@ -757,7 +799,7 @@ void Minecraft::tickInput() {
 				if (key == Keyboard::KEY_T) {
 					options.thirdPersonView = !options.thirdPersonView;
 				}
-				if (key == Keyboard::KEY_F3) {
+				if (options.debugScreenEnabled && key == Keyboard::KEY_F3) {
 					options.renderDebug = !options.renderDebug;
 				}
 			#endif
@@ -853,7 +895,7 @@ void Minecraft::tickInput() {
 						if (player->inventory->getItem(i))
 							player->inventory->dropSlot(i, false);
 				}
-				if (key == Keyboard::KEY_F3) {
+				if (options.debugScreenEnabled && key == Keyboard::KEY_F3) {
 					options.renderDebug = !options.renderDebug;
 				}
 				if (key == Keyboard::KEY_M) {
@@ -971,7 +1013,10 @@ void Minecraft::handleMouseDown(int button, bool down) {
 #ifndef STANDALONE_SERVER
 #ifndef RPI
 	if(player->isUsingItem()) {
-		if(!down && !Keyboard::isKeyDown(options.keyUse.key)) {
+		bool isHoldingUse = Keyboard::isKeyDown(options.keyUse.key)
+			|| (!options.useTouchScreen
+				&& Mouse::isButtonDown(MouseAction::ACTION_RIGHT));
+		if(!down && !isHoldingUse) {
 			gameMode->releaseUsingItem(player);
 		}
 		return;
@@ -1214,6 +1259,14 @@ void Minecraft::init()
 	LOGI("IS TOUCHSCREEN? %d\n", options.useTouchScreen);
 
 	textures = new Textures(&options, platform());
+	// These are Java Beta's climate lookup tables, not render textures.  Keep
+	// a CPU-side copy so chunk tinting works on every graphics backend.
+	TextureId grassColorId = textures->loadTexture("misc/grasscolor.png");
+	const TextureData* grassColor = textures->getTemporaryTextureData(grassColorId);
+	if (grassColor) GrassColor::init(grassColor->data, grassColor->w, grassColor->h);
+	TextureId foliageColorId = textures->loadTexture("misc/foliagecolor.png");
+	const TextureData* foliageColor = textures->getTemporaryTextureData(foliageColorId);
+	if (foliageColor) FoliageColor::init(foliageColor->data, foliageColor->w, foliageColor->h);
 	textures->addDynamicTexture(new WaterTexture());
 	textures->addDynamicTexture(new WaterSideTexture());
 	gui.texturesLoaded(textures);
@@ -1246,7 +1299,13 @@ void Minecraft::init()
 		options.setSettingsPath(externalStoragePath + "options.txt");
 	}
 #endif
+	// Capture this before reloadOptions() writes the default file.  Existing
+	// installations keep their current setup and never see the welcome page.
+	const bool firstRun = !options.hasSavedOptions();
 	reloadOptions();
+	if (firstRun) {
+		setScreen(new WelcomeScreen());
+	}
 
 }
 
@@ -1451,6 +1510,18 @@ void Minecraft::generateLevel( const std::string& message, Level* level )
 
 void Minecraft::_levelGenerated()
 {
+	if (level->getLevelData()->getWorldType() == WorldType::Sky) {
+		// A failed initial search is already final; do not repeat it on the UI thread.
+		if (level->getSharedSpawnPos().y >= 0) level->validateSpawn();
+		if (level->getSharedSpawnPos().y < 0) {
+			_hasSignaledGeneratingLevelFinished = true;
+			leaveGame();
+#ifndef STANDALONE_SERVER
+			setScreen(new DisconnectionScreen("Sky: no safe spawn found nearby."));
+#endif
+			return;
+		}
+	}
 #ifndef STANDALONE_SERVER
 	if (player == NULL) {
 		player = (LocalPlayer*) gameMode->createPlayer(level);
@@ -1655,6 +1726,11 @@ ICreator* Minecraft::getCreator()
 }
 
 void Minecraft::optionUpdated( const Options::Option* option, bool value ) {
+	if (option == &Options::Option::BETA_VISUALS && levelRenderer != NULL) {
+		// Grass and leaf tint is baked into chunk meshes, so switching the
+		// presentation mode must invalidate them immediately.
+		levelRenderer->allChanged();
+	}
 	if(netCallback != NULL && option == &Options::Option::SERVER_VISIBLE) {
 		ServerSideNetworkHandler* ss = (ServerSideNetworkHandler*) netCallback;
 		ss->allowIncomingConnections(value);

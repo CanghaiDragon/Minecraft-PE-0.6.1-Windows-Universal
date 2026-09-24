@@ -17,10 +17,15 @@ PauseScreen::PauseScreen(bool wasBackPaused)
 	wasBackPaused(wasBackPaused),
 	bSound(&Options::Option::SOUND, 1, 0),
 	bThirdPerson(&Options::Option::THIRD_PERSON),
-    bHideGui(&Options::Option::HIDE_GUI)
+	bHideGui(&Options::Option::HIDE_GUI),
+	bEntityButton(5, ""),
+	entityButtonState(false)
 {
 	ImageDef def;
-	def.setSrc(IntRectangle(160, 144, 39, 31));
+	// touchguinew.png keeps the pause icons in three consecutive rows.
+	// The first two rows are the sound and camera buttons; the third row is
+	// reserved for the F3/entity toggle.
+	def.setSrc(IntRectangle(160, 142, 39, 31));
 	def.name = "gui/touchgui.png";
 	IntRectangle& defSrc = *def.getSrc();
 
@@ -28,9 +33,20 @@ PauseScreen::PauseScreen(bool wasBackPaused)
 	def.height = defSrc.h * 0.666667f;
 
 	bSound.setImageDef(def, true);
-	defSrc.y += defSrc.h;
+	defSrc.y = 173;
 	bThirdPerson.setImageDef(def, true);
     bHideGui.setImageDef(def, true);
+	// F3 toggle frames are the two wrench buttons in the bottom-right row.
+	entityButtonOff.setSrc(IntRectangle(160, 204, 39, 31));
+	entityButtonOff.name = "gui/touchgui.png";
+	entityButtonOff.width = 39 * 0.666667f;
+	entityButtonOff.height = 31 * 0.666667f;
+	entityButtonOn.setSrc(IntRectangle(199, 204, 39, 31));
+	entityButtonOn.name = "gui/touchgui.png";
+	entityButtonOn.width = 39 * 0.666667f;
+	entityButtonOn.height = 31 * 0.666667f;
+	entityButtonState = false;
+	bEntityButton.setImageDef(entityButtonState ? entityButtonOn : entityButtonOff, true);
 	//void setImageDef(ImageDef& imageDef, bool setButtonSize);
 }
 
@@ -43,6 +59,9 @@ PauseScreen::~PauseScreen() {
 }
 
 void PauseScreen::init() {
+	entityButtonState = minecraft->options.renderDebug;
+	bEntityButton.setImageDef(entityButtonState ? entityButtonOn : entityButtonOff, false);
+
 	if (minecraft->useTouchscreen()) {
 		bContinue = new Touch::TButton(1, "Back to game");
 		bQuit = new Touch::TButton(2, "Quit to title");
@@ -65,6 +84,9 @@ void PauseScreen::init() {
 	bHideGui.updateImage(&minecraft->options);
 	buttons.push_back(&bSound);
 	buttons.push_back(&bThirdPerson);
+	bEntityButton.visible = minecraft->options.debugScreenEnabled;
+	if (bEntityButton.visible)
+		buttons.push_back(&bEntityButton);
     //buttons.push_back(&bHideGui);
 
 	// If Back wasn't pressed, set up additional items (more than Quit to menu
@@ -119,6 +141,8 @@ void PauseScreen::setupPositions() {
 	bSound.x = 4;
 	bThirdPerson.x = bSound.x + 4 + bSound.width;
 	bHideGui.x = bThirdPerson.x + 4 + bThirdPerson.width;
+	bEntityButton.y = bThirdPerson.y;
+	bEntityButton.x = bThirdPerson.x + bThirdPerson.width + 4;
 
 	//bThirdPerson->x = (width - bThirdPerson->w) / 2;
 	//bThirdPerson->y = yBase + 32 * 4;
@@ -131,6 +155,15 @@ void PauseScreen::tick() {
 
 void PauseScreen::render(int xm, int ym, float a) {
 	renderBackground();
+
+	// Keep the icon synchronized with keyboard/F3 changes made outside this
+	// pause screen.
+	bool debugEnabled = minecraft->options.renderDebug;
+	bEntityButton.visible = minecraft->options.debugScreenEnabled;
+	if (entityButtonState != debugEnabled) {
+		entityButtonState = debugEnabled;
+		bEntityButton.setImageDef(entityButtonState ? entityButtonOn : entityButtonOff, false);
+	}
 
 	//bool isSaving = !minecraft->level.pauseSave(saveStep++);
 	//if (isSaving || visibleTime < 20) {
@@ -147,6 +180,13 @@ void PauseScreen::render(int xm, int ym, float a) {
 }
 
 void PauseScreen::buttonClicked(Button* button) {
+	if (button->id == bEntityButton.id) {
+		if (!minecraft->options.debugScreenEnabled)
+			return;
+		entityButtonState = !entityButtonState;
+		minecraft->options.renderDebug = entityButtonState;
+		bEntityButton.setImageDef(entityButtonState ? entityButtonOn : entityButtonOff, false);
+	}
 	if (button->id == bContinue->id) {
 		minecraft->setScreen(NULL);
 		//minecraft->grabMouse();

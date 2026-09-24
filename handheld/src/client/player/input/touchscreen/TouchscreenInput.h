@@ -63,6 +63,10 @@ private:
 	RectangleArea* aPause;
 	//RectangleArea* aUpJump;
 	RectangleArea* aJump;
+	RectangleArea* aSneak;
+	RectangleArea* aJumpRight;
+	RectangleArea* aFlightUp;
+	RectangleArea* aFlightDown;
 	RectangleArea* aUpLeft;
 	RectangleArea* aUpRight;
 	bool _pauseIsDown;
@@ -73,8 +77,10 @@ private:
 	// used to turn the camera must never replace or clear that movement input.
 	int _dpadPointerId;
 	float _sneakTapTime;
+	bool _legacyFlightHeightMode;
+	int _legacyFlightPointer;
 
-	bool _buttons[8];
+	bool _buttons[10];
 	bool isButtonDown(int areaId);
 	void rebuild();
 };

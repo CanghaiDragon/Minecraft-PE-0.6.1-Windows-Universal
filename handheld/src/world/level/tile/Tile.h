@@ -108,6 +108,10 @@ public:
     static bool shouldTick[NUM_BLOCK_TYPES];
     static bool solid[NUM_BLOCK_TYPES];
     static bool isEntityTile[NUM_BLOCK_TYPES];
+	// Client-side presentation switch.  Chunk meshes are rebuilt when it changes.
+	static bool betaVisuals;
+	static void setBetaVisuals(bool enabled) { betaVisuals = enabled; }
+	static bool useBetaVisuals() { return betaVisuals; }
     static int lightBlock[NUM_BLOCK_TYPES];
     static bool translucent[NUM_BLOCK_TYPES];
     static int lightEmission[NUM_BLOCK_TYPES];

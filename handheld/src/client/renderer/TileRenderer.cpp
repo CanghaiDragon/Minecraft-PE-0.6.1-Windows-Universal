@@ -59,6 +59,12 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 	float r11 = c11 * r;
 	float g11 = c11 * g;
 	float b11 = c11 * b;
+	// Save the biome colour before the base grass block is switched to white.
+	// Java Beta then lays its greyscale grass fringe (terrain tile 38) over
+	// the dirt side texture and tints only that fringe.
+	float grassR = r;
+	float grassG = g;
+	float grassB = b;
 
 	if (tt == (Tile*)Tile::grass) {
 		r = g = b = 1.0f;
@@ -97,7 +103,12 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 		float br = tt->getBrightness(level, x, y, z - 1);
 		if (tt->zz0 > 0) br = centerBrightness;
 		t.color(r2 * br, g2 * br, b2 * br);
-		renderNorth(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 2));
+		int tex = tt->getTexture(level, x, y, z, 2);
+		renderNorth(tt, xf, yf, zf, tex);
+		if (Tile::useBetaVisuals() && tex == 3) {
+			t.color(c2 * br * grassR, c2 * br * grassG, c2 * br * grassB);
+			renderNorth(tt, xf, yf, zf, 38);
+		}
 		changed = true;
 	}
 
@@ -105,7 +116,12 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 		float br = tt->getBrightness(level, x, y, z + 1);
 		if (tt->zz1 < 1) br = centerBrightness;
 		t.color(r2 * br, g2 * br, b2 * br);
-		renderSouth(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 3));
+		int tex = tt->getTexture(level, x, y, z, 3);
+		renderSouth(tt, xf, yf, zf, tex);
+		if (Tile::useBetaVisuals() && tex == 3) {
+			t.color(c2 * br * grassR, c2 * br * grassG, c2 * br * grassB);
+			renderSouth(tt, xf, yf, zf, 38);
+		}
 		changed = true;
 	}
 
@@ -113,7 +129,12 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 		float br = tt->getBrightness(level, x - 1, y, z);
 		if (tt->xx0 > 0) br = centerBrightness;
 		t.color(r3 * br, g3 * br, b3 * br);
-		renderWest(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 4));
+		int tex = tt->getTexture(level, x, y, z, 4);
+		renderWest(tt, xf, yf, zf, tex);
+		if (Tile::useBetaVisuals() && tex == 3) {
+			t.color(c2 * br * grassR, c2 * br * grassG, c2 * br * grassB);
+			renderWest(tt, xf, yf, zf, 38);
+		}
 		changed = true;
 	}
 
@@ -121,7 +142,12 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 		float br = tt->getBrightness(level, x + 1, y, z);
 		if (tt->xx1 < 1) br = centerBrightness;
 		t.color(r3 * br, g3 * br, b3 * br);
-		renderEast(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 5));
+		int tex = tt->getTexture(level, x, y, z, 5);
+		renderEast(tt, xf, yf, zf, tex);
+		if (Tile::useBetaVisuals() && tex == 3) {
+			t.color(c2 * br * grassR, c2 * br * grassG, c2 * br * grassB);
+			renderEast(tt, xf, yf, zf, 38);
+		}
 		changed = true;
 	}
 
@@ -920,7 +946,15 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 		c4r *= ll4;
 		c4g *= ll4;
 		c4b *= ll4;
-		renderNorth(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 2));
+		int tex = tt->getTexture(level, pX, pY, pZ, 2);
+		renderNorth(tt, (float) pX, (float) pY, (float) pZ, tex);
+		if (Tile::useBetaVisuals() && tex == 3) {
+			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
+			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
+			c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
+			c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			renderNorth(tt, (float) pX, (float) pY, (float) pZ, 38);
+		}
 		i = true;
 	}
 	if ((noCulling) || (tt->shouldRenderFace(level, pX, pY, pZ + 1, 3))) {
@@ -973,7 +1007,15 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 		c4r *= ll4;
 		c4g *= ll4;
 		c4b *= ll4;
-		renderSouth(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 3));
+		int tex = tt->getTexture(level, pX, pY, pZ, 3);
+		renderSouth(tt, (float) pX, (float) pY, (float) pZ, tex);
+		if (Tile::useBetaVisuals() && tex == 3) {
+			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
+			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
+			c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
+			c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			renderSouth(tt, (float) pX, (float) pY, (float) pZ, 38);
+		}
 		i = true;
 	}
 	if ((noCulling) || (tt->shouldRenderFace(level, pX - 1, pY, pZ, 4))) {
@@ -1025,7 +1067,15 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 		c4r *= ll4;
 		c4g *= ll4;
 		c4b *= ll4;
-		renderWest(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 4));
+		int tex = tt->getTexture(level, pX, pY, pZ, 4);
+		renderWest(tt, (float) pX, (float) pY, (float) pZ, tex);
+		if (Tile::useBetaVisuals() && tex == 3) {
+			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
+			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
+			c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
+			c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			renderWest(tt, (float) pX, (float) pY, (float) pZ, 38);
+		}
 		i = true;
 	}
 	if ((noCulling) || (tt->shouldRenderFace(level, pX + 1, pY, pZ, 5))) {
@@ -1078,7 +1128,15 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 		c4g *= ll4;
 		c4b *= ll4;
 
-		renderEast(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 5));
+		int tex = tt->getTexture(level, pX, pY, pZ, 5);
+		renderEast(tt, (float) pX, (float) pY, (float) pZ, tex);
+		if (Tile::useBetaVisuals() && tex == 3) {
+			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
+			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
+			c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
+			c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			renderEast(tt, (float) pX, (float) pY, (float) pZ, 38);
+		}
 		i = true;
 	}
 	applyAmbienceOcclusion = false;

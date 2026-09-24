@@ -12,6 +12,7 @@ public:
     void save(const StringVector& settings);
 	StringVector getOptionStrings();
 	void setSettingsPath(const std::string& path);
+	bool exists() const;
 
 private:
 	std::string settingsPath;

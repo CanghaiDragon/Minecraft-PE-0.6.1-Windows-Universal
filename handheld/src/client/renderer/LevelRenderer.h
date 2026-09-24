@@ -44,7 +44,9 @@ public:
 	void renderDebug(const AABB& b, float a) const;
 
 	void renderSky(float alpha);
+	void renderBetaSky(float alpha);
 	void renderClouds(float alpha);
+	void renderBetaClouds(float alpha);
 	void renderEntities(Vec3 cam, Culler* culler, float a);
     void renderSameAsLast(int layer, float alpha);
 	void renderHit(Player* player, const HitResult& h, int mode, /*ItemInstance*/void* inventoryItem, float a);

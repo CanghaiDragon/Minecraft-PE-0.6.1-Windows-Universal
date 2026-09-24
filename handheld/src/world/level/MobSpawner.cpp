@@ -24,6 +24,24 @@ static int _bedEnemies[] = {
 
 static const std::vector<int> bedEnemies(_bedEnemies, _bedEnemies + sizeof(_bedEnemies) / sizeof(_bedEnemies[0]));
 
+static int getLowestSkyMonsterSpawnY(Level* level, int x, int z) {
+	// Require two standable layers in the same column. A bare island has only
+	// its exposed top surface; a cave or recessed ledge has a lower floor plus
+	// another surface above it. Return that lowest sheltered candidate.
+	int lowestY = -1;
+	for (int y = 1; y < Level::DEPTH - 1; ++y) {
+		if (level->isSolidBlockingTile(x, y - 1, z)
+			&& !level->isSolidBlockingTile(x, y, z)
+			&& !level->getMaterial(x, y, z)->isLiquid()
+			&& !level->isSolidBlockingTile(x, y + 1, z)) {
+			if (lowestY >= 0)
+				return lowestY;
+			lowestY = y;
+		}
+	}
+	return -1;
+}
+
 /*static*/
 int MobSpawner::tick(Level* level, bool spawnEnemies, bool spawnFriendlies) {
 
@@ -33,7 +51,9 @@ int MobSpawner::tick(Level* level, bool spawnEnemies, bool spawnFriendlies) {
         return 0;
     }
 
-    chunksToPoll.clear();
+	chunksToPoll.clear();
+	const int worldType = level->getLevelData()->getWorldType();
+	const bool infiniteWorld = level->getLevelData()->isInfinite();
 	// Add all chunks as a quick-and-dirty test
 	// (The code above is the same as in the java version)
 	// This code goes over the whole map one "row" at a time
@@ -41,8 +61,23 @@ int MobSpawner::tick(Level* level, bool spawnEnemies, bool spawnFriendlies) {
 	// Spawn friendlies == loop over whole map, and disable Monster spawning this tick
 	if (spawnFriendlies) {
 		spawnEnemies = false;
-		for (int i = 0; i < 256; ++i)
-			chunksToPoll.insert( std::make_pair( ChunkPos(i>>4, i&15), false) );
+		if (!infiniteWorld) {
+			// Original MCPE 0.6.1 behavior: the complete finite 16 x 16 map.
+			for (int i = 0; i < 256; ++i)
+				chunksToPoll.insert( std::make_pair( ChunkPos(i>>4, i&15), false) );
+		} else if (level->players.size()) {
+			Player* p = level->players[0];
+			int xx = Mth::floor(p->x / 16);
+			int zz = Mth::floor(p->z / 16);
+			int r = 128 / 16;
+			for (int x = -r; x <= r; x++)
+			for (int z = -r; z <= r; z++) {
+				const int cx = xx + x;
+				const int cz = zz + z;
+				if (level->hasChunk(cx, cz))
+					chunksToPoll.insert(std::make_pair(ChunkPos(cx, cz), false));
+			}
+		}
 
 	} else {
 		// Only spawn mobs, check around one player per tick (@todo: optimize the "count instances of"?)
@@ -57,7 +92,11 @@ int MobSpawner::tick(Level* level, bool spawnEnemies, bool spawnFriendlies) {
 			for (int z = -r; z <= r; z++) {
 				const int cx = xx + x;
 				const int cz = zz + z;
-				if (cx >= 0 && cx < 16 && cz >= 0 && cz < 16)
+				// Old worlds are still bounded to their original 16 x 16 chunk
+				// area. Infinite worlds must instead use the chunks already loaded
+				// around the player, including chunks with negative coordinates.
+				if (infiniteWorld ? level->hasChunk(cx, cz)
+					: cx >= 0 && cx < 16 && cz >= 0 && cz < 16)
 					chunksToPoll.insert(std::make_pair(ChunkPos(cx, cz), false ));
 			}
 		}
@@ -83,6 +122,9 @@ chunkLoop:
             int xStart = start.x;
             int yStart = start.y;
             int zStart = start.z;
+			if (worldType == WorldType::Sky && &mobCategory == &MobCategory::monster)
+				yStart = getLowestSkyMonsterSpawnY(level, xStart, zStart);
+			if (&mobCategory == &MobCategory::monster && yStart < 1) continue;
 
 			if (level->isSolidBlockingTile(xStart, yStart, zStart)) continue;
 
@@ -107,6 +149,9 @@ chunkLoop:
 					x += level->random.nextInt(ss) - level->random.nextInt(ss);
                     y += level->random.nextInt(1) - level->random.nextInt(1);
                     z += level->random.nextInt(ss) - level->random.nextInt(ss);
+					if (worldType == WorldType::Sky && &mobCategory == &MobCategory::monster)
+						y = getLowestSkyMonsterSpawnY(level, x, z);
+					if (&mobCategory == &MobCategory::monster && y < 1) continue;
                     // int y = heightMap[x + z * w] + 1;
 
                     if (isSpawnPositionOk(mobCategory, level, x, y, z)) {

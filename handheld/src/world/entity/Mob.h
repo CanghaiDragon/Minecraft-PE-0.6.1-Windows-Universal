@@ -42,6 +42,7 @@ public:
 
 	virtual void spawnAnim();
     virtual std::string getTexture();
+	void setTextureName(const std::string& value) { textureName = value; }
 
 	virtual bool isAlive();
     virtual bool isPickable();

@@ -8,6 +8,17 @@
 
 class Button;
 
+// The F3 button uses two separate ImageDefs (dark/light) rather than the
+// normal horizontal hover frame used by ImageButton.  Hover feedback is
+// still provided by ImageButton::scaleWhenPressed.
+class F3ImageButton : public ImageButton {
+public:
+	F3ImageButton(int id, const std::string& msg) : ImageButton(id, msg) {}
+
+protected:
+	virtual bool isSecondImage(bool hovered) { return false; }
+};
+
 class PauseScreen: public Screen
 {
 	typedef Screen super;
@@ -38,6 +49,10 @@ private:
 	OptionButton bSound;
 	OptionButton bThirdPerson;
     OptionButton bHideGui;
+	F3ImageButton bEntityButton;
+	ImageDef entityButtonOff;
+	ImageDef entityButtonOn;
+	bool entityButtonState;
 };
 
 #endif /*NET_MINECRAFT_CLIENT_GUI__PauseScreen_H__*/

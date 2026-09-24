@@ -1,5 +1,8 @@
 #include "TallGrass.h"
 #include "../FoliageColor.h"
+#include "../GrassColor.h"
+#include "../LevelSource.h"
+#include "../biome/BiomeSource.h"
 #include "../../entity/player/Player.h"
 #include "../../item/Item.h"
 #include "../../item/ShearsItem.h"
@@ -32,7 +35,12 @@ int TallGrass::getColor( LevelSource* level, int x, int y, int z ) {
 	int d = level->getData(x, y, z);
 	if (d == DEAD_SHRUB) return 0xffffff;
 
-	return 0x339933;//level->getBiome(x, z)->getGrassColor();
+	if (Tile::useBetaVisuals()) {
+		level->getBiomeSource()->getBiomeBlock(x, z, 1, 1);
+		return GrassColor::get(level->getBiomeSource()->temperatures[0],
+			level->getBiomeSource()->downfalls[0]);
+	}
+	return 0x339933;
 }
 
 int TallGrass::getResource( int data, Random* random ) {

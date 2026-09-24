@@ -60,7 +60,7 @@ protected:
 	virtual void mouseScrolled(int x, int y, int delta) {}
 
 	virtual void keyPressed(int eventKey);
-	virtual void keyboardNewChar(char inputChar) {}
+	virtual void keyboardNewChar(char inputChar);
 public:
 	int width;
 	int height;
@@ -73,9 +73,10 @@ protected:
 
 	std::vector<Button*> tabButtons;
 	int tabButtonIndex;
+	bool tabNavigationActive;
 
 	Font* font;
-private:
+protected:
 	Button* clickedButton;
 };
 

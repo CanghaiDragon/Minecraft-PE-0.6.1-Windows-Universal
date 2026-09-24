@@ -1,4 +1,5 @@
 #include "NinecraftApp.h"
+#include "platform/ExitTrace.h"
 //#include <EGL/egl.h>
 
 #ifdef RPI
@@ -63,7 +64,9 @@ NinecraftApp::NinecraftApp()
 
 NinecraftApp::~NinecraftApp()
 {
+	MCPE_EXIT_TRACE("NinecraftApp destructor: begin");
 	teardown();
+	MCPE_EXIT_TRACE("NinecraftApp destructor: complete");
 }
 
 void NinecraftApp::init()
@@ -109,7 +112,11 @@ void NinecraftApp::init()
 
 #ifndef STANDALONE_SERVER
 	LOGI("This: %p\n", this);
-	screenChooser.setScreen(SCREEN_STARTMENU);
+	// Minecraft::init may install a first-run screen before this point.  Do
+	// not overwrite it with the normal title screen.
+	if (screen == NULL) {
+		screenChooser.setScreen(SCREEN_STARTMENU);
+	}
 #else
 	user->name = "Server";
 	hostMultiplayer();
@@ -118,24 +125,34 @@ void NinecraftApp::init()
 
 void NinecraftApp::teardown()
 {
+	MCPE_EXIT_TRACE("NinecraftApp teardown: begin");
 	// Note: Don't tear down statics if we run on Android
 	// (we might change this in the future)
 #ifndef ANDROID
+	MCPE_EXIT_TRACE("NinecraftApp teardown: static biomes");
 	Biome::teardownBiomes();
+	MCPE_EXIT_TRACE("NinecraftApp teardown: static items");
 	Item ::teardownItems();
+	MCPE_EXIT_TRACE("NinecraftApp teardown: static tiles");
 	Tile ::teardownTiles();
+	MCPE_EXIT_TRACE("NinecraftApp teardown: static materials");
 	Material::teardownMaterials();
+	MCPE_EXIT_TRACE("NinecraftApp teardown: static recipes");
 	Recipes ::teardownRecipes();
+	MCPE_EXIT_TRACE("NinecraftApp teardown: static tile entities");
 	TileEntity::teardownTileEntities();
 #endif
 #if !defined(ANDROID) && !defined(STANDALONE_SERVER)
+	MCPE_EXIT_TRACE("NinecraftApp teardown: item renderer");
 	ItemRenderer::teardown_static();
 	if (EntityTileRenderer::instance != NULL) {
+		MCPE_EXIT_TRACE("NinecraftApp teardown: entity tile renderer");
 		delete EntityTileRenderer::instance;
 		EntityTileRenderer::instance = NULL;
 	}
 	TileEntityRenderDispatcher::destroy();
 #endif
+	MCPE_EXIT_TRACE("NinecraftApp teardown: complete");
 }
 
 void NinecraftApp::update()

@@ -89,6 +89,7 @@ StartMenuScreen::StartMenuScreen()
 :	bHost(    2, "Start Game"),
 	bJoin(    3, "Join Game"),
 	bOptions( 4, "Options"),
+	bQuit(    5, ""),
 	bBuy(     5),
 	bTest(    9, "Create")
 {
@@ -118,7 +119,14 @@ void StartMenuScreen::init()
 	buttons.push_back(&bHost);
 	buttons.push_back(&bJoin);
 	buttons.push_back(&bOptions);
-    
+	ImageDef quitImage;
+	quitImage.name = "gui/touchgui.png";
+	quitImage.width = 34;
+	quitImage.height = 26;
+	quitImage.setSrc(IntRectangle(150, 0, 34, 26));
+	bQuit.setImageDef(quitImage, true);
+	bQuit.scaleWhenPressed = false;
+	buttons.push_back(&bQuit);
     //buttons.push_back(&bTest);
 
 	tabButtons.push_back(&bHost);
@@ -173,6 +181,8 @@ void StartMenuScreen::setupPositions() {
 	bJoin.x		= 0*buttonWidth + (int)(1*spacing);
 	bHost.x		= 1*buttonWidth + (int)(2*spacing);
 	bOptions.x	= 2*buttonWidth + (int)(3*spacing);
+	bQuit.x = width - bQuit.width;
+	bQuit.y = 0;
 	//bBuy.y = bOptions.y - bBuy.h - 6;
 	//bBuy.x = bOptions.x + bOptions.w - bBuy.w;
 
@@ -218,10 +228,9 @@ void StartMenuScreen::buttonClicked(::Button* button) {
 	{
 		minecraft->setScreen(new OptionsScreen());
 	}
-	if (button->id == bBuy.id)
+	if (button == &bQuit)
 	{
-		minecraft->platform()->buyGame();
-		//minecraft->setScreen(new BuyGameScreen());
+		minecraft->quit();
 	}
 }
 
@@ -230,7 +239,6 @@ bool StartMenuScreen::isInGameScreen() { return false; }
 void StartMenuScreen::render( int xm, int ym, float a )
 {
 	renderBackground();
-    
     glEnable2(GL_BLEND);
 
 #if defined(RPI)

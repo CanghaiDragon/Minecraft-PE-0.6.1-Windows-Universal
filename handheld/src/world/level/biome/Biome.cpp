@@ -18,6 +18,7 @@ Biome* Biome::desert		 = NULL;
 Biome* Biome::plains		 = NULL;
 Biome* Biome::iceDesert		 = NULL;
 Biome* Biome::tundra		 = NULL;
+Biome* Biome::sky			 = NULL;
 
 /*static*/
 Biome::MobList Biome::_emptyMobList;
@@ -119,6 +120,12 @@ void Biome::initBiomes() {
 	plains			= (new FlatBiome())->setColor(0xFFD910)->setName("Plains");
 	iceDesert		= (new FlatBiome())->setColor(0xFFED93)->clearMobs(true, false, false)->setName("Ice Desert")->setSnowCovered()->setLeafColor(0xC4D339);
 	tundra			= (new Biome())->setColor(0x57EBF9)->setName("Tundra")->setSnowCovered()->setLeafColor(0xC4D339);
+	// Keep PE's ordinary animals and hostile mobs, but bias Sky strongly
+	// toward chickens. The inherited friendly weights total 40, including
+	// 10 chicken and 30 non-chicken; adding 80 yields 90 / 120 = 75%.
+	// FixedBiomeSource supplies the fixed Sky climate.
+	sky				= (new Biome())->setColor(0x8080FF)->setName("Sky");
+	sky->_friendlies.insert(sky->_friendlies.end(), MobSpawnerData(MobTypes::Chicken, 80, 2, 4));
 	
 	recalc();
 }
@@ -135,6 +142,7 @@ void Biome::teardownBiomes() {
 	delete plains;			plains    = NULL;
 	delete iceDesert;		iceDesert = NULL;
 	delete tundra;			tundra	  = NULL;
+	delete sky;				sky		 = NULL;
 }
 
 Feature* Biome::getTreeFeature( Random* random )
@@ -204,11 +212,24 @@ float Biome::adjustDepth( float depth )
 
 int Biome::getSkyColor( float temp )
 {
-//	temp /= 3.f;
-//	if (temp < -1) temp = -1;
-//	if (temp > 1) temp = 1;
-	return 0x80808080;
-	//return Color.getHSBColor(224 / 360.0f - temp * 0.05f, 0.50f + temp * 0.1f, 1.0f).getRGB();
+	// Java Beta's BiomeGenBase.getSkyColorByTemp.  The ordinary PE path does
+	// not call this method, so its original sky palette remains untouched.
+	temp /= 3.0f;
+	if (temp < -1.0f) temp = -1.0f;
+	if (temp > 1.0f) temp = 1.0f;
+	float hue = 0.6222222f - temp * 0.05f;
+	float saturation = 0.50f + temp * 0.10f;
+	float h = hue * 6.0f;
+	int sector = (int)h;
+	float f = h - sector, p = 1.0f - saturation;
+	float q = 1.0f - saturation * f, t = 1.0f - saturation * (1.0f - f);
+	float r = 1.0f, g = 1.0f, b = 1.0f;
+	switch (sector % 6) {
+	case 0: r = 1; g = t; b = p; break; case 1: r = q; g = 1; b = p; break;
+	case 2: r = p; g = 1; b = t; break; case 3: r = p; g = q; b = 1; break;
+	case 4: r = t; g = p; b = 1; break; case 5: r = 1; g = p; b = q; break;
+	}
+	return ((int)(r * 255.0f) << 16) | ((int)(g * 255.0f) << 8) | (int)(b * 255.0f);
 }
 
 Biome::MobList& Biome::getMobs(const MobCategory& category)

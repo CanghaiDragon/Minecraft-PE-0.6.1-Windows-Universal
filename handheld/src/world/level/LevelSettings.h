@@ -14,6 +14,7 @@ namespace GameType {
 namespace WorldType {
 	const int Old      = 0; // finite 256×256 world
 	const int Infinite = 1; // infinite procedural world
+	const int Sky      = 2; // infinite floating-island terrain, normal dimension
 }
 
 class LevelSettings

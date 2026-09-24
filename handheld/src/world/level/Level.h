@@ -173,6 +173,7 @@ public:
 	Vec3 getFogColor(float a);
     Vec3 getCloudColor(float a);
     Vec3 getSkyColor(Entity* source, float a);
+	Vec3 getBetaSkyColor(Entity* source, float a);
 
 	bool canSeeSky(int x, int y, int z);
 	int getLightDepth(int x, int z);
@@ -282,6 +283,7 @@ protected:
 	virtual ChunkSource* createChunkSource();
 
 private:
+    bool findSkySpawn(int x, int z);
 	void neighborChanged(int x, int y, int z, int type);
 	//void saveAllChunks();
 	void tickTiles();

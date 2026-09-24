@@ -13,6 +13,7 @@ const char* OptionStrings::Graphics_RenderDistance     = "gfx_renderdistance";
 const char* OptionStrings::Graphics_GuiScale           = "gfx_guiscale";
 const char* OptionStrings::Graphics_ViewBobbing        = "gfx_viewbobbing";
 const char* OptionStrings::Graphics_FOV                = "gfx_fov";
+const char* OptionStrings::Graphics_BetaVisuals        = "gfx_beta_visuals";
 
 const char* OptionStrings::Controls_Sensitivity        = "ctrl_sensitivity";
 const char* OptionStrings::Controls_InvertMouse        = "ctrl_invertmouse";
@@ -26,3 +27,7 @@ const char* OptionStrings::Game_DifficultyLevel = "game_difficulty";
 const char* OptionStrings::Game_ThirdPerson = "game_thirdperson";
 const char* OptionStrings::Game_HideGui = "game_hidegui";
 const char* OptionStrings::Extra_InfiniteWorlds = "extra_infinite_worlds";
+const char* OptionStrings::Skin_ArmType = "skin_arm_type";
+const char* OptionStrings::Skin_Menu = "skin_menu";
+const char* OptionStrings::Touch_Sneak = "touch_sneak";
+const char* OptionStrings::Extra_DebugScreen = "extra_debug_screen";

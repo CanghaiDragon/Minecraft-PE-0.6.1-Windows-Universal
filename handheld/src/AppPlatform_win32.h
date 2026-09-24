@@ -9,6 +9,7 @@
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include <windows.h>
 
 static void png_funcReadFile(png_structp pngPtr, png_bytep data, png_size_t length) {
 	((std::istream*)png_get_io_ptr(pngPtr))->read((char*)data, length);
@@ -50,9 +51,27 @@ public:
 	{
 		TextureData out;
 
-		std::string filename = textureFolder? "data/images/" + filename_
-											: filename_;
+		std::string filename = filename_;
+		if (textureFolder) {
+			// Assets belong beside the executable in a portable game folder.
+			// Do not depend on Visual Studio's (often unrelated) working folder.
+			char executablePath[MAX_PATH] = {0};
+			DWORD length = GetModuleFileNameA(NULL, executablePath, MAX_PATH);
+			std::string executableDirectory(executablePath, length);
+			std::string::size_type slash = executableDirectory.find_last_of("\\/");
+			if (slash != std::string::npos)
+				executableDirectory.erase(slash + 1);
+			else
+				executableDirectory.clear();
+			filename = executableDirectory + "data/images/" + filename_;
+		}
 		std::ifstream source(filename.c_str(), std::ios::binary);
+		if (!source && textureFolder) {
+			// Retain the historical source-tree lookup for developer builds.
+			filename = "data/images/" + filename_;
+			source.clear();
+			source.open(filename.c_str(), std::ios::binary);
+		}
 
 		if (source) {
 			png_structp pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
@@ -71,6 +90,20 @@ public:
 			png_set_read_fn(pngPtr,(voidp)&source, png_funcReadFile);
 
 			png_read_info(pngPtr, infoPtr);
+
+			// Always ask libpng for RGBA.  Beta's paletted sun/moon PNGs use a
+			// tRNS alpha channel; reading them as raw rows corrupts their stride
+			// and turns the transparent area into an opaque square.
+			const int colorType = png_get_color_type(pngPtr, infoPtr);
+			const int bitDepth = png_get_bit_depth(pngPtr, infoPtr);
+			if (bitDepth == 16) png_set_strip_16(pngPtr);
+			if (colorType == PNG_COLOR_TYPE_PALETTE) png_set_palette_to_rgb(pngPtr);
+			if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8) png_set_expand_gray_1_2_4_to_8(pngPtr);
+			if (png_get_valid(pngPtr, infoPtr, PNG_INFO_tRNS)) png_set_tRNS_to_alpha(pngPtr);
+			if (colorType == PNG_COLOR_TYPE_GRAY || colorType == PNG_COLOR_TYPE_GRAY_ALPHA) png_set_gray_to_rgb(pngPtr);
+			if (!(colorType & PNG_COLOR_MASK_ALPHA) && !png_get_valid(pngPtr, infoPtr, PNG_INFO_tRNS))
+				png_set_add_alpha(pngPtr, 0xff, PNG_FILLER_AFTER);
+			png_read_update_info(pngPtr, infoPtr);
 
 			// Set up the texdata properties
 			out.w = png_get_image_width(pngPtr, infoPtr);

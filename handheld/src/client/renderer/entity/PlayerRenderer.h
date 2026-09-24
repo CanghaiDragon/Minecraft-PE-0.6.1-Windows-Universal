@@ -11,6 +11,9 @@ public:
 	~PlayerRenderer();
 
 	virtual int prepareArmor(Mob* mob, int layer, float a);
+	bool isModernPlayerSkin(Mob* mob);
+	virtual void render(Entity* mob, float x, float y, float z, float rot, float a);
+	void setModernSkin(Mob* mob);
 
 	virtual void setupPosition(Entity* mob, float x, float y, float z);
 	virtual void setupRotations(Entity* mob, float bob, float bodyRot, float a);
@@ -18,6 +21,9 @@ public:
 	virtual void renderName(Mob* mob, float x, float y, float z);
 	virtual void onGraphicsReset();
 private:
+	HumanoidModel* playerModel32;
+	HumanoidModel* playerModel64;
+	HumanoidModel* playerModelSlim;
 	HumanoidModel* armorParts1;
 	HumanoidModel* armorParts2;
 };

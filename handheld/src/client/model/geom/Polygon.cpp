@@ -12,15 +12,15 @@ PolygonQuad::PolygonQuad(VertexPT* v0, VertexPT* v1, VertexPT* v2, VertexPT* v3)
 }
 
 PolygonQuad::PolygonQuad(	VertexPT* v0, VertexPT* v1, VertexPT* v2, VertexPT* v3,
-					int uu0, int vv0, int uu1, int vv1)
+					int uu0, int vv0, int uu1, int vv1, float texW, float texH)
 :	_flipNormal(false)
 {
-	const float us = -0.002f / 64.0f;//0.1f / 64.0f;
-	const float vs = -0.002f / 32.0f;//0.1f / 32.0f;
-	vertices[0] = v0->remap(uu1 / 64.0f - us, vv0 / 32.0f + vs);
-	vertices[1] = v1->remap(uu0 / 64.0f + us, vv0 / 32.0f + vs);
-	vertices[2] = v2->remap(uu0 / 64.0f + us, vv1 / 32.0f - vs);
-	vertices[3] = v3->remap(uu1 / 64.0f - us, vv1 / 32.0f - vs);
+	const float us = -0.002f / texW;
+	const float vs = -0.002f / texH;
+	vertices[0] = v0->remap(uu1 / texW - us, vv0 / texH + vs);
+	vertices[1] = v1->remap(uu0 / texW + us, vv0 / texH + vs);
+	vertices[2] = v2->remap(uu0 / texW + us, vv1 / texH - vs);
+	vertices[3] = v3->remap(uu1 / texW - us, vv1 / texH - vs);
 }
 
 PolygonQuad::PolygonQuad(	VertexPT* v0, VertexPT* v1, VertexPT* v2, VertexPT* v3,

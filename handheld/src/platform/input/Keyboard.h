@@ -74,6 +74,9 @@ public:
 	static const int KEY_ESCAPE = 27;
 	static const int KEY_SPACE = 32;
 	static const int KEY_LSHIFT = 10;
+	// Kept outside the Win32 virtual-key range used by the game.  This is a
+	// modifier state only; it is not a movement binding.
+	static const int KEY_LEFT_CTRL = 232;
 
 	static bool isKeyDown(int keyCode) {
 		return _states[keyCode] == KeyboardAction::KEYDOWN;

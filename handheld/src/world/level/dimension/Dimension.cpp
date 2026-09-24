@@ -3,12 +3,45 @@
 
 //#include "../levelgen/SimpleLevelSource.h"
 #include "../levelgen/RandomLevelSource.h"
+#include "../levelgen/SkyLevelSource.h"
 #include "../Level.h"
 #include "../biome/BiomeSource.h"
+#include "../biome/FixedBiomeSource.h"
+#include "../biome/Biome.h"
 #include "../chunk/ChunkSource.h"
 #include "../tile/Tile.h"
+#include "../material/Material.h"
 #include "../../../util/Mth.h"
 
+namespace {
+
+const int SKY_SPAWN_PLATFORM_RADIUS = 4;
+const int SKY_SPAWN_MIN_PLATFORM_BLOCKS = 32;
+
+bool hasSkySpawnPlatform(Level* level, int x, int y, int z) {
+	int platformBlocks = 0;
+
+	for (int dx = -SKY_SPAWN_PLATFORM_RADIUS; dx <= SKY_SPAWN_PLATFORM_RADIUS; ++dx) {
+		for (int dz = -SKY_SPAWN_PLATFORM_RADIUS; dz <= SKY_SPAWN_PLATFORM_RADIUS; ++dz) {
+			if (dx * dx + dz * dz > SKY_SPAWN_PLATFORM_RADIUS * SKY_SPAWN_PLATFORM_RADIUS)
+				continue;
+
+			// getTopSolidBlock deliberately ignores leaves, so tree canopies do not
+			// make an otherwise tiny island appear large enough to spawn on.
+			int surfaceY = level->getTopSolidBlock(x + dx, z + dz) - 1;
+			if (surfaceY < y - 1 || surfaceY > y + 1)
+				continue;
+
+			++platformBlocks;
+			if (platformBlocks >= SKY_SPAWN_MIN_PLATFORM_BLOCKS)
+				return true;
+		}
+	}
+
+	return false;
+}
+
+}
 
 Dimension::Dimension()
 :	foggy(false),
@@ -33,11 +66,29 @@ void Dimension::init( Level* level )
 
 void Dimension::init()
 {
-	biomeSource = new BiomeSource(level);
+	if (level->getLevelData()->getWorldType() == WorldType::Sky)
+		biomeSource = new FixedBiomeSource(Biome::sky, 0.5f, 0.0f);
+	else
+		biomeSource = new BiomeSource(level);
 }
 
 /*virtual*/
 bool Dimension::isValidSpawn(int x, int z) {
+    if (level->getLevelData()->getWorldType() == WorldType::Sky) {
+        int y = level->getTopTileY(x, z);
+        if (y < 0 || y > Level::DEPTH - 3) return false;
+        int tile = level->getTile(x, y, z);
+        for (int dy = 1; dy <= 2; ++dy) {
+            const Material* material = level->getMaterial(x, y + dy, z);
+            if (material != Material::air && material != Material::topSnow
+                && material != Material::plant && material != Material::replaceable_plant) return false;
+        }
+        if (tile == 0 || tile == Tile::invisible_bedrock->id
+            || tile == Tile::cactus->id
+            || !Tile::tiles[tile] || !Tile::tiles[tile]->isSolidRender()) return false;
+
+        return hasSkySpawnPlatform(level, x, y, z);
+    }
     int topTile = level->getTopTile(x, z);
 
 	if (topTile == Tile::invisible_bedrock->id)
@@ -54,6 +105,9 @@ float Dimension::getTimeOfDay(long time, float a) {
 }
 
 ChunkSource* Dimension::createRandomLevelSource() {
+	if (level->getLevelData()->getWorldType() == WorldType::Sky)
+		return new SkyLevelSource(level, level->getSeed(),
+			!level->isClientSide && level->getLevelData()->getSpawnMobs());
 	return new RandomLevelSource(
 		level,
 		level->getSeed(),

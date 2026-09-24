@@ -9,6 +9,7 @@ class TileEntity;
 */
 class Material;
 class Biome;
+class BiomeSource;
 
 class LevelSource
 {
@@ -29,7 +30,9 @@ public:
     virtual bool isSolidRenderTile(int x, int i, int z) = 0;
 	virtual bool isSolidBlockingTile(int x, int i, int z) = 0;
 
-    //virtual BiomeSource* getBiomeSource() = 0;
+	// Needed by Java Beta's temperature/downfall colour-map lookup during
+	// chunk tessellation, including tessellation through Region.
+	virtual BiomeSource* getBiomeSource() = 0;
 	virtual Biome* getBiome(int x, int z) = 0;
 };
 
