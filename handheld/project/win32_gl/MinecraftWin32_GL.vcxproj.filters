@@ -561,6 +561,9 @@
     <ClCompile Include="..\..\src\client\gui\screens\StartMenuScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\client\gui\screens\WelcomeScreen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\client\gui\screens\UploadPhotoScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1584,6 +1587,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\client\gui\screens\StartMenuScreen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\client\gui\screens\WelcomeScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\client\gui\screens\UploadPhotoScreen.h">

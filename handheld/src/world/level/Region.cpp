@@ -18,11 +18,15 @@ Region::Region(Level* level, int x1, int y1, int z1, int x2, int y2, int z2) {
 	for (int i = 0; i < size_x; ++i)
 		chunks[i] = new LevelChunk*[size_z];
 
-    for (int xc = xc1; xc <= xc2; xc++) {
-        for (int zc = zc1; zc <= zc2; zc++) {
-            chunks[xc - xc1][zc - zc1] = level->getChunk(xc, zc);
-        }
-    }
+	for (int xc = xc1; xc <= xc2; xc++) {
+		for (int zc = zc1; zc <= zc2; zc++) {
+			// Rendering may only consume resident chunks.  Calling getChunk here
+			// would synchronously generate terrain on the render update path.
+			chunks[xc - xc1][zc - zc1] = level->hasLoadedChunk(xc, zc)
+				? level->getChunk(xc, zc)
+				: NULL;
+		}
+	}
 }
 
 Region::~Region() {
@@ -100,7 +104,9 @@ int Region::getRawBrightness(int x, int y, int z, bool propagate) {
     int xc = (x >> 4) - xc1;
     int zc = (z >> 4) - zc1;
 
-    return chunks[xc][zc]->getRawBrightness(x & 15, y, z & 15, level->skyDarken);
+	if (xc < 0 || xc >= size_x || zc < 0 || zc >= size_z) return Level::MAX_BRIGHTNESS;
+	if (chunks[xc][zc] == NULL) return Level::MAX_BRIGHTNESS;
+	return chunks[xc][zc]->getRawBrightness(x & 15, y, z & 15, level->skyDarken);
 }
 
 int Region::getData(int x, int y, int z) {
@@ -109,7 +115,9 @@ int Region::getData(int x, int y, int z) {
     int xc = (x >> 4) - xc1;
     int zc = (z >> 4) - zc1;
 
-    return chunks[xc][zc]->getData(x & 15, y, z & 15);
+	if (xc < 0 || xc >= size_x || zc < 0 || zc >= size_z) return 0;
+	if (chunks[xc][zc] == NULL) return 0;
+	return chunks[xc][zc]->getData(x & 15, y, z & 15);
 }
 
 const Material* Region::getMaterial(int x, int y, int z) {

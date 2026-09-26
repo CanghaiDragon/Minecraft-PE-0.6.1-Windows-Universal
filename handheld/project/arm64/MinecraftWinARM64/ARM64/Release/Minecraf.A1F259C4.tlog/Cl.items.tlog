@@ -47,6 +47,7 @@ D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\client\gui\screens\RenameMPLevelSc
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\client\gui\screens\ScreenChooser.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\ScreenChooser.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\client\gui\screens\SelectWorldScreen.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\SelectWorldScreen.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\client\gui\screens\StartMenuScreen.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\StartMenuScreen.obj
+D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\client\gui\screens\WelcomeScreen.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\WelcomeScreen.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\client\gui\screens\TextEditScreen.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\TextEditScreen.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\client\gui\screens\touch\TouchIngameBlockSelectionScreen.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\TouchIngameBlockSelectionScreen.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\client\gui\screens\touch\TouchJoinGameScreen.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\TouchJoinGameScreen.obj
@@ -286,6 +287,7 @@ D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\item\PickaxeItem.cpp;D:\MCPE
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\item\ShovelItem.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\ShovelItem.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\biome\Biome.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\Biome.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\biome\BiomeSource.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\BiomeSource.obj
+D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\biome\FixedBiomeSource.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\FixedBiomeSource.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\chunk\LevelChunk.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\LevelChunk.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\dimension\Dimension.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\Dimension.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\Explosion.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\Explosion.obj
@@ -296,6 +298,7 @@ D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\levelgen\feature\Featu
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\levelgen\LargeCaveFeature.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\LargeCaveFeature.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\levelgen\LargeFeature.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\LargeFeature.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\levelgen\RandomLevelSource.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\RandomLevelSource.obj
+D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\levelgen\SkyLevelSource.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\SkyLevelSource.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\levelgen\synth\ImprovedNoise.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\ImprovedNoise.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\levelgen\synth\PerlinNoise.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\PerlinNoise.obj
 D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\src\world\level\levelgen\synth\Synth.cpp;D:\MCPE_0.6.1\MCPE0.6.1Universal\handheld\project\arm64\MinecraftWinARM64\ARM64\Release\Synth.obj

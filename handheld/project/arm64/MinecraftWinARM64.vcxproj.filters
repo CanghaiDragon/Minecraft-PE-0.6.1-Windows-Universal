@@ -248,6 +248,9 @@
     <ClCompile Include="..\..\src\world\level\levelgen\RandomLevelSource.cpp">
       <Filter>Source Files\world\level\levelgen</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\world\level\levelgen\SkyLevelSource.cpp">
+      <Filter>Source Files\world\level\levelgen</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\world\level\material\Material.cpp">
       <Filter>Source Files\world\level\material</Filter>
     </ClCompile>
@@ -620,6 +623,9 @@
     <ClCompile Include="..\..\src\world\level\biome\BiomeSource.cpp">
       <Filter>Source Files\world\level\biome</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\world\level\biome\FixedBiomeSource.cpp">
+      <Filter>Source Files\world\level\biome</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\world\level\biome\Biome.cpp">
       <Filter>Source Files\world\level\biome</Filter>
     </ClCompile>
@@ -726,6 +732,9 @@
       <Filter>Source Files\client\gui\screens</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\client\gui\screens\StartMenuScreen.cpp">
+      <Filter>Source Files\client\gui\screens</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\client\gui\screens\WelcomeScreen.cpp">
       <Filter>Source Files\client\gui\screens</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\client\gui\screens\UploadPhotoScreen.cpp">
@@ -2252,6 +2261,9 @@
       <Filter>Source Files\client\gui\screens</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\client\gui\screens\StartMenuScreen.h">
+      <Filter>Source Files\client\gui\screens</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\client\gui\screens\WelcomeScreen.h">
       <Filter>Source Files\client\gui\screens</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\client\gui\screens\UploadPhotoScreen.h">

@@ -64,6 +64,7 @@
     <ClCompile Include="..\..\src\client\gui\screens\ScreenChooser.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\SelectWorldScreen.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\StartMenuScreen.cpp" />
+    <ClCompile Include="..\..\src\client\gui\screens\WelcomeScreen.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\TextEditScreen.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\touch\TouchIngameBlockSelectionScreen.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\touch\TouchJoinGameScreen.cpp" />
@@ -303,6 +304,7 @@
     <ClCompile Include="..\..\src\world\item\ShovelItem.cpp" />
     <ClCompile Include="..\..\src\world\level\biome\Biome.cpp" />
     <ClCompile Include="..\..\src\world\level\biome\BiomeSource.cpp" />
+    <ClCompile Include="..\..\src\world\level\biome\FixedBiomeSource.cpp" />
     <ClCompile Include="..\..\src\world\level\chunk\LevelChunk.cpp" />
     <ClCompile Include="..\..\src\world\level\dimension\Dimension.cpp" />
     <ClCompile Include="..\..\src\world\level\Explosion.cpp" />
@@ -313,6 +315,7 @@
     <ClCompile Include="..\..\src\world\level\levelgen\LargeCaveFeature.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\LargeFeature.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\RandomLevelSource.cpp" />
+    <ClCompile Include="..\..\src\world\level\levelgen\SkyLevelSource.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\synth\ImprovedNoise.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\synth\PerlinNoise.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\synth\Synth.cpp" />
@@ -414,6 +417,7 @@
     <ClInclude Include="..\..\src\client\gui\screens\ScreenChooser.h" />
     <ClInclude Include="..\..\src\client\gui\screens\SelectWorldScreen.h" />
     <ClInclude Include="..\..\src\client\gui\screens\StartMenuScreen.h" />
+    <ClInclude Include="..\..\src\client\gui\screens\WelcomeScreen.h" />
     <ClInclude Include="..\..\src\client\gui\screens\TextEditScreen.h" />
     <ClInclude Include="..\..\src\client\gui\screens\touch\TouchIngameBlockSelectionScreen.h" />
     <ClInclude Include="..\..\src\client\gui\screens\touch\TouchJoinGameScreen.h" />
@@ -880,6 +884,7 @@
     <ClInclude Include="..\..\src\world\level\biome\Biome.h" />
     <ClInclude Include="..\..\src\world\level\biome\BiomeInclude.h" />
     <ClInclude Include="..\..\src\world\level\biome\BiomeSource.h" />
+    <ClInclude Include="..\..\src\world\level\biome\FixedBiomeSource.h" />
     <ClInclude Include="..\..\src\world\level\biome\FlatBiome.h" />
     <ClInclude Include="..\..\src\world\level\biome\ForestBiome.h" />
     <ClInclude Include="..\..\src\world\level\biome\RainforestBiome.h" />
@@ -916,6 +921,7 @@
     <ClInclude Include="..\..\src\world\level\levelgen\LargeCaveFeature.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\LargeFeature.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\RandomLevelSource.h" />
+    <ClInclude Include="..\..\src\world\level\levelgen\SkyLevelSource.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\synth\ImprovedNoise.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\synth\PerlinNoise.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\synth\Synth.h" />
@@ -1024,13 +1030,13 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
+    <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>NotSet</CharacterSet>
     <PlatformToolset>v145</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug DEMO|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
+    <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>NotSet</CharacterSet>
     <PlatformToolset>v145</PlatformToolset>
   </PropertyGroup>
@@ -1076,7 +1082,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PreprocessorDefinitions>GLDEBUG;WIN32_WGL;WIN32;_DEBUG;_CRT_SECURE_NO_WARNINGS;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
@@ -1095,7 +1101,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PreprocessorDefinitions>DEMO_MODE;WIN32_WGL;WIN32;_DEBUG;_CRT_SECURE_NO_WARNINGS;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>

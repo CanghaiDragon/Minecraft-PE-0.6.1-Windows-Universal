@@ -64,6 +64,7 @@
     <ClCompile Include="..\..\src\client\gui\screens\ScreenChooser.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\SelectWorldScreen.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\StartMenuScreen.cpp" />
+    <ClCompile Include="..\..\src\client\gui\screens\WelcomeScreen.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\TextEditScreen.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\touch\TouchIngameBlockSelectionScreen.cpp" />
     <ClCompile Include="..\..\src\client\gui\screens\touch\TouchJoinGameScreen.cpp" />
@@ -414,6 +415,7 @@
     <ClInclude Include="..\..\src\client\gui\screens\ScreenChooser.h" />
     <ClInclude Include="..\..\src\client\gui\screens\SelectWorldScreen.h" />
     <ClInclude Include="..\..\src\client\gui\screens\StartMenuScreen.h" />
+    <ClInclude Include="..\..\src\client\gui\screens\WelcomeScreen.h" />
     <ClInclude Include="..\..\src\client\gui\screens\TextEditScreen.h" />
     <ClInclude Include="..\..\src\client\gui\screens\touch\TouchIngameBlockSelectionScreen.h" />
     <ClInclude Include="..\..\src\client\gui\screens\touch\TouchJoinGameScreen.h" />

@@ -804,6 +804,16 @@ void Minecraft::tickInput() {
 				}
 			#endif
 			#if defined(WIN32)
+				// Match the desktop edition's default shortcuts while retaining the
+				// corresponding toggles in the options screen.
+				if (key == Keyboard::KEY_F1) {
+					options.hideGui = !options.hideGui;
+				}
+
+				if (key == Keyboard::KEY_F5) {
+					options.thirdPersonView = !options.thirdPersonView;
+				}
+
 				if (key == Keyboard::KEY_F) {
 					options.isFlying = !options.isFlying;
 					player->noPhysics = options.isFlying;
