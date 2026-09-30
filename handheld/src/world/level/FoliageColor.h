@@ -2,6 +2,9 @@
 #define NET_MINECRAFT_WORLD_LEVEL__FoliageColor_H__
 
 #include <vector>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 class FoliageColor
 {

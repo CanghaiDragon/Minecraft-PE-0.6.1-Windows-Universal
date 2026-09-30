@@ -71,8 +71,10 @@ NinecraftApp::~NinecraftApp()
 
 void NinecraftApp::init()
 {
+	MCPE_EXIT_TRACE("NinecraftApp::init begin");
 	// Global initialization goes here
 	Mth::initMth();
+	MCPE_EXIT_TRACE("NinecraftApp::init after Mth");
 
 	//#ifdef DEMO_MODE
 	//writeDemoFile();
@@ -90,25 +92,36 @@ void NinecraftApp::init()
 		Item::initItems();
 		Biome::initBiomes();
 		TileEntity::initTileEntities();
+		MCPE_EXIT_TRACE("NinecraftApp::init after static registries");
 
 	#ifdef ANDROID
 	}
 	#endif
 
 #ifndef STANDALONE_SERVER
+	MCPE_EXIT_TRACE("NinecraftApp::init before initGLStates");
 	initGLStates();
+	MCPE_EXIT_TRACE("NinecraftApp::init after initGLStates");
+	MCPE_EXIT_TRACE("NinecraftApp::init before Tesselator");
 	Tesselator::instance.init();
+	MCPE_EXIT_TRACE("NinecraftApp::init after Tesselator");
+	MCPE_EXIT_TRACE("NinecraftApp::init before I18n");
 	I18n::loadLanguage(platform(), "en_US");
+	MCPE_EXIT_TRACE("NinecraftApp::init after I18n");
 #endif
 
+	MCPE_EXIT_TRACE("NinecraftApp::init before Minecraft::init");
 	Minecraft::init();
+	MCPE_EXIT_TRACE("NinecraftApp::init after Minecraft::init");
 
 #if !defined(DEMO_MODE) && !defined(APPLE_DEMO_PROMOTION) && !defined(NO_STORAGE)
 	storageSource = new ExternalFileLevelStorageSource(externalStoragePath, externalCacheStoragePath);
+	MCPE_EXIT_TRACE("NinecraftApp::init after storage source");
 #else
 	storageSource = new MemoryLevelStorageSource();
 #endif
 	_running = false;
+	MCPE_EXIT_TRACE("NinecraftApp::init complete");
 
 #ifndef STANDALONE_SERVER
 	LOGI("This: %p\n", this);
@@ -158,6 +171,8 @@ void NinecraftApp::teardown()
 void NinecraftApp::update()
 {
 	++_frames;
+	if (_frames <= 4)
+		MCPE_EXIT_TRACE("NinecraftApp::update frame=%d before Minecraft::update", _frames);
 
 	// Generate Multitouch active pointer list
 	Multitouch::commit();
@@ -168,8 +183,12 @@ void NinecraftApp::update()
 #endif /*ANDROID_PUBLISH*/
 
 	Minecraft::update();
+	if (_frames <= 4)
+		MCPE_EXIT_TRACE("NinecraftApp::update frame=%d after Minecraft::update", _frames);
 
 	swapBuffers();
+	if (_frames <= 4)
+		MCPE_EXIT_TRACE("NinecraftApp::update frame=%d after swapBuffers", _frames);
 	Mouse::reset2();
 
     // Restart the server if (our modded) RakNet reports an error

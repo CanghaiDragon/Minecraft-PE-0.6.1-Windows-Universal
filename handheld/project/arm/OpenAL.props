@@ -12,10 +12,10 @@
     <OpenALArchitecture Condition="'$(Platform)' == 'Win32'">x86</OpenALArchitecture>
     <OpenALArchitecture Condition="'$(Platform)' == 'x64'">x64</OpenALArchitecture>
     <OpenALArchitecture Condition="'$(Platform)' == 'ARM64'">arm64</OpenALArchitecture>
-    <OpenALArchitecture Condition="'$(Platform)' == 'ARM'">arm32</OpenALArchitecture>
+    <OpenALArchitecture Condition="'$(Platform)' == 'ARM'">arm</OpenALArchitecture>
     <OpenALSharedLibRoot>$(MSBuildThisFileDirectory)..\..\lib</OpenALSharedLibRoot>
     <OpenALIncludeDirectory>$(OpenALSharedLibRoot)\include</OpenALIncludeDirectory>
-    <OpenALLibraryDirectory Condition="'$(OpenALPlatformFamily)' == 'win32' and '$(OpenALArchitecture)' == 'x86'">$(OpenALSharedLibRoot)\lib\x86</OpenALLibraryDirectory>
+    <OpenALLibraryDirectory Condition="'$(OpenALPlatformFamily)' == 'win32' and '$(OpenALArchitecture)' == 'x86'">$(OpenALSharedLibRoot)\lib</OpenALLibraryDirectory>
     <OpenALLibraryDirectory Condition="'$(OpenALPlatformFamily)' == 'win32' and '$(OpenALArchitecture)' != 'x86'">$(OpenALSharedLibRoot)\lib\$(OpenALArchitecture)</OpenALLibraryDirectory>
   </PropertyGroup>
 
@@ -36,3 +36,4 @@
   </Target>
 
 </Project>
+

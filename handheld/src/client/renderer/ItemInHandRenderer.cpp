@@ -36,7 +36,11 @@ ItemInHandRenderer::ItemInHandRenderer( Minecraft* mc )
 	item(0, 1, 0)
 {
 	GLuint ids[MaxNumRenderObjects];
+#ifdef USE_VBO
 	glGenBuffers2(MaxNumRenderObjects, ids);
+#else
+	for (int i = 0; i < MaxNumRenderObjects; ++i) ids[i] = 0;
+#endif
 
 	for (int i = 0; i < MaxNumRenderObjects; ++i) {
 		renderObjects[i].itemId = -1;
@@ -526,7 +530,11 @@ void ItemInHandRenderer::renderFire( float a )
 void ItemInHandRenderer::onGraphicsReset()
 {
 	GLuint ids[MaxNumRenderObjects];
+#ifdef USE_VBO
 	glGenBuffers2(MaxNumRenderObjects, ids);
+#else
+	for (int i = 0; i < MaxNumRenderObjects; ++i) ids[i] = 0;
+#endif
 
 	for (int i = 0; i < MaxNumRenderObjects; ++i) {
 		renderObjects[i].itemId = -1;

@@ -67,6 +67,7 @@ void ExternalFileLevelStorageSource::addLevelSummaryIfExists(LevelSummaryList& d
 void ExternalFileLevelStorageSource::getLevelList(LevelSummaryList& dest)
 {
 #ifdef WIN32
+	LOGI("ARM diag: getLevelList basePath=%s\n", basePath.c_str());
 
 	WIN32_FIND_DATAA fileData;
 	HANDLE hFind;
@@ -75,6 +76,7 @@ void ExternalFileLevelStorageSource::getLevelList(LevelSummaryList& dest)
 	searchString += "/*";
 
 	hFind = FindFirstFileA(searchString.c_str(), &fileData);
+	LOGI("ARM diag: FindFirstFile handle=%p\n", (void*)hFind);
 	if (hFind != INVALID_HANDLE_VALUE)  {
 		do {
 			if (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -83,6 +85,7 @@ void ExternalFileLevelStorageSource::getLevelList(LevelSummaryList& dest)
 		} while (FindNextFileA(hFind, &fileData));
 		FindClose(hFind);
 	} 
+	LOGI("ARM diag: getLevelList scan end\n");
 
 
 #else

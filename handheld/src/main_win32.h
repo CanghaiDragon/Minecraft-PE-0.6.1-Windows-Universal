@@ -23,6 +23,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
 #include "platform/input/Mouse.h"
 #include "platform/input/Multitouch.h"
 #include "platform/input/TouchTrace.h"
@@ -44,6 +45,7 @@ static int g_win32MouseMoveTraceBudget = 0;
 // Write a small crash report beside the executable.  This is intentionally
 // self-contained and uses only Windows APIs so it also works on ARM64 test
 // devices without a debugger or extra runtime DLLs.
+#if defined(MCPE_ENABLE_CRASH_TRACE)
 static LONG WINAPI mcpeWin32CrashHandler(EXCEPTION_POINTERS* info) {
 	FILE* f = std::fopen("MinecraftWin32-crash.log", "ab");
 	if (f) {
@@ -54,6 +56,49 @@ static LONG WINAPI mcpeWin32CrashHandler(EXCEPTION_POINTERS* info) {
 				info->ExceptionRecord->ExceptionAddress,
 				(unsigned long)info->ExceptionRecord->ExceptionFlags);
 		}
+		// CaptureStackBackTrace() is not reliable enough on ARM32 to identify
+		// the faulting instruction.  Record the processor context supplied by
+		// Windows so the real PC/LR can be mapped through the matching .map.
+		if (info && info->ContextRecord) {
+#if defined(_ARM_)
+			std::fprintf(f, "context arch=ARM32 pc=%p lr=%p sp=%p\n",
+				(void*)(uintptr_t)info->ContextRecord->Pc,
+				(void*)(uintptr_t)info->ContextRecord->Lr,
+				(void*)(uintptr_t)info->ContextRecord->Sp);
+			std::fprintf(f,
+				"context ARM32 r0=%p r1=%p r2=%p r3=%p r4=%p r5=%p r6=%p r7=%p\n",
+				(void*)(uintptr_t)info->ContextRecord->R0,
+				(void*)(uintptr_t)info->ContextRecord->R1,
+				(void*)(uintptr_t)info->ContextRecord->R2,
+				(void*)(uintptr_t)info->ContextRecord->R3,
+				(void*)(uintptr_t)info->ContextRecord->R4,
+				(void*)(uintptr_t)info->ContextRecord->R5,
+				(void*)(uintptr_t)info->ContextRecord->R6,
+				(void*)(uintptr_t)info->ContextRecord->R7);
+			std::fprintf(f,
+				"context ARM32 r8=%p r9=%p r10=%p r11=%p r12=%p\n",
+				(void*)(uintptr_t)info->ContextRecord->R8,
+				(void*)(uintptr_t)info->ContextRecord->R9,
+				(void*)(uintptr_t)info->ContextRecord->R10,
+				(void*)(uintptr_t)info->ContextRecord->R11,
+				(void*)(uintptr_t)info->ContextRecord->R12);
+#elif defined(_ARM64_)
+			std::fprintf(f, "context arch=ARM64 pc=%p lr=%p sp=%p\n",
+				(void*)(uintptr_t)info->ContextRecord->Pc,
+				(void*)(uintptr_t)info->ContextRecord->Lr,
+				(void*)(uintptr_t)info->ContextRecord->Sp);
+#elif defined(_X86_)
+			std::fprintf(f, "context arch=X86 eip=%p esp=%p ebp=%p\n",
+				(void*)(uintptr_t)info->ContextRecord->Eip,
+				(void*)(uintptr_t)info->ContextRecord->Esp,
+				(void*)(uintptr_t)info->ContextRecord->Ebp);
+#elif defined(_AMD64_)
+			std::fprintf(f, "context arch=X64 rip=%p rsp=%p rbp=%p\n",
+				(void*)(uintptr_t)info->ContextRecord->Rip,
+				(void*)(uintptr_t)info->ContextRecord->Rsp,
+				(void*)(uintptr_t)info->ContextRecord->Rbp);
+#endif
+		}
 		void* frames[32] = {};
 		USHORT count = CaptureStackBackTrace(0, 32, frames, NULL);
 		for (USHORT i = 0; i < count; ++i)
@@ -63,6 +108,7 @@ static LONG WINAPI mcpeWin32CrashHandler(EXCEPTION_POINTERS* info) {
 	}
 	return EXCEPTION_CONTINUE_SEARCH;
 }
+#endif
 
 // True while one or more real touchscreen contacts are active.
 // Used to prevent Windows-promoted mouse messages from contaminating Multitouch.
@@ -548,7 +594,10 @@ void inputNetworkThread(void* userdata)
 
 int main(void) {
 	MCPE_EXIT_TRACE("main: begin");
+#if defined(MCPE_ENABLE_CRASH_TRACE)
 	SetUnhandledExceptionFilter(mcpeWin32CrashHandler);
+#endif
+	MCPE_EXIT_TRACE("main: exception filter installed");
 	AppContext appContext;
 	MSG sMessage;
 #ifndef STANDALONE_SERVER
@@ -557,7 +606,9 @@ int main(void) {
 
 	// Window and input initialization are shared by the EGL and WGL variants.
 	appContext.platform = new AppPlatform_win32();
+	MCPE_EXIT_TRACE("main: platform created");
 	platform(&hwnd, appContext.platform->getScreenWidth(), appContext.platform->getScreenHeight());
+	MCPE_EXIT_TRACE("main: window created hwnd=%p", (void*)hwnd);
 	ShowWindow(hwnd, SW_SHOW);
 	SetForegroundWindow(hwnd);
 	SetFocus(hwnd);
@@ -573,18 +624,21 @@ int main(void) {
 
 #if defined(WIN32_WGL)
 	Win32WglContext wglContext = {};
+	MCPE_EXIT_TRACE("main: before WGL context");
 	if (!createWin32WglContext(hwnd, &wglContext)) {
 		printf("Unable to create the Win32 WGL compatibility context (error %lu)\n", GetLastError());
 		appContext.platform->finish();
 		delete appContext.platform;
 		return 1;
 	}
+	MCPE_EXIT_TRACE("main: WGL context created");
 	appContext.graphicsContext = &wglContext;
 	appContext.swapGraphicsBuffers = swapWin32WglBuffers;
 	appContext.doRender = true;
 
 	// The context must be current before GLEW loads desktop GL extensions.
 	glInit();
+	MCPE_EXIT_TRACE("main: GL initialized");
 #else
 	// Must run before the first EGL call; PVRVFrame otherwise opens its SDK
 	// control panel while it initializes the emulated GLES context.
@@ -630,13 +684,18 @@ int main(void) {
 	glInit();
 #endif // WIN32_WGL
 #endif
+	MCPE_EXIT_TRACE("main: before app allocation");
 	App* app = new MAIN_CLASS();
+	MCPE_EXIT_TRACE("main: app allocated=%p", (void*)app);
 
 	g_app = app;
 	((MAIN_CLASS*)g_app)->externalStoragePath = ".";
 	((MAIN_CLASS*)g_app)->externalCacheStoragePath = ".";
+	MCPE_EXIT_TRACE("main: before app init");
 	g_app->init(appContext);
+	MCPE_EXIT_TRACE("main: app init complete");
 	g_app->setSize(appContext.platform->getScreenWidth(), appContext.platform->getScreenHeight());
+	MCPE_EXIT_TRACE("main: app size set");
 
 	//_beginthread(inputNetworkThread, 0, 0);
 	

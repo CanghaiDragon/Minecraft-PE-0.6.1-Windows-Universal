@@ -1,249 +1,107 @@
-# Minecraft PE v0.6.1
+# **Minecraft PE 0.6.1 Windows Universal**
 
-A leaked source code of **Minecraft Pocket Edition v0.6.1**. Ported to macOS and Linux, with Android modernizations and infinite world support.
+This project came from a leaked source code of **Minecraft Pocket Edition v0.6.1**. It rebuild the game to let it works on modern Windows platforms, including x64, x86, arm64 and arm architecture, with several bug fixes, optimization and additional contents.
 
-**NOT FOR COMMERCIAL PURPOSES.**
+Feel free to fork this project, but **DO NOT** use for commercial purposes.
 
----
-
-## Platforms
-
-| Platform | Status | Build system | Notes |
-|---|---|---|---|
-| Android | Original + Modernized | NDK (`handheld/project/android/`) | armeabi-v7a / arm64-v8a, immersive fullscreen, modern multitouch |
-| iOS | Modernized | Xcode (`handheld/project/iosproj/`) | MetalANGLE GLES2, iOS 17+ (code signing required) |
-| Windows x86 | Maintained | Visual Studio (`handheld/project/x86/`) | MSVC, legacy OpenGL ES emulator |
-| Windows x64 | Scaffolded | Visual Studio (`handheld/project/x64/`) | Requires x64 EGL/GLES, PNG, zlib, and OpenAL binaries |
-| Raspberry Pi | Original | Makefile (`handheld/project/raspberry/`) | GLES 1.x, SDL 1.2 |
-| macOS (arm64) | Community port | Makefile (`handheld/project/macos/`) | SDL2 + OpenGL 2.1 + OpenAL |
-| Linux (x86_64) | Community port | Makefile (`handheld/project/linux/`) | SDL2 + OpenGL 2.1 + OpenAL |
+(待补充一版中文的readme)
 
 ---
 
-## Building
+## References & Quote
 
-### Android
+In March 2026, the source code of Minecraft Pocket Edition v0.6.1 was leaked on the Internet. You can find it at [Minecraft PE Source Code : mojang : Free Download, Borrow, and Streaming : Internet Archive](https://archive.org/details/Minecraftpesorucecode). This is the reason why several revisions of MCPE0.6.1 appears on github and other sites. All the revisions **DO NOT** have direct authorization from Mojang. This project is also a revision of the origin code. If it infring your intellectual property, please contact me and I will takedown this repository.
 
-Requires **NDK r16b** (last release with `stlport_static`).
+This project was originally forked from programmer1o1's repository [GitHub - programmer1o1/MinecraftPE-v0.6.1: Leaked Minecraft Pocket Edition v0.6.1 source code, ported to macOS, Linux, and modernized for Android 10-14+ and modern iOS. For educational and preservation purposes only. · GitHub](https://github.com/programmer1o1/MinecraftPE-v0.6.1). (I will call it **Project B** below for convenience) However it became more and more distinguished after several revisions and updates. Unlike programmer1o1's respository, which transplant the game to several operating system, this project only focus on Windows, but transplant the game on all four architectures instead of only x86. Overall, this project is originated from programmer1o1's repository, with several features such as localized options and infinite world, but have done far more optimizations and new features.
 
-```
-cd handheld/project/android
-$NDK_ROOT/ndk-build -j4 NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=jni/Android.mk
-```
+Some features in this project use code from [GitHub - Minecraft-PE-0-6-1/minecraft-pe-0.6.1-on-all: Dont do pull requests or issue to this repo. Maintaining repo is gitea repo · GitHub](https://github.com/Minecraft-PE-0-6-1/minecraft-pe-0.6.1-on-all) (I will call it **Project A** below for convenience) for reference especially on code related to Java Beta Visuals.
 
-The APK targets API 28 with `minSdkVersion` 9. Runtime storage permissions are requested automatically on API 23+. On API 30+ (Android 11+), the app requests "All Files Access" on first launch.
+The additional feature "Sky" world type was originated from the unused feature in Minecraft Java Edition Beta 1.7.3. The original source code of b1.7.3 was used for reference, with the help of Mod Coder Pack. You can download MCP at [mcp43](https://www.mediafire.com/file/03d94f13c9ulj5a/mcp43.zip).
 
----
+(待补充四个依赖.dll的引用)
 
-### macOS
+The main work of this project is assisted with the help of Codex.
 
-**Dependencies** — install via [Homebrew](https://brew.sh):
+--- 
 
-```
-brew install sdl2 libpng zlib
-```
+# Features
 
-System frameworks (no extra install needed): `OpenGL`, `OpenAL`, `Foundation`.
+## Basic feature of MCPE0.6.1
 
-```
-cd handheld/project/macos
-make -j8
-./minecraftpe
-```
+This project basically keep all the features of MCPE0.6.1 on win32 platform, including old world generation, mobs, sky and light rendering, nether reactor(待验证), as well as the whole touch screen control mode.
 
----
+### New Features
 
-### Linux
+There are six mian new features that are neither in original MCPE0.6.1 nor Project B.
 
-**Dependencies** — install via your package manager:
+- Multi architecture versions on Windows platform, with native dependencies, including x86, x64, arm and arm64(现在还差arm和x86)
 
-```
-# Ubuntu / Debian
-sudo apt-get install libsdl2-dev libpng-dev zlib1g-dev libopenal-dev libgl1-mesa-dev
+- Two types of new world, Infinite world (exist in Project B) and Sky world(会在下面单独介绍)
 
-# Fedora / RHEL
-sudo dnf install SDL2-devel libpng-devel zlib-devel openal-soft-devel mesa-libGL-devel
+- A brand new graphic visual effect that originated from Java Edition Beta's visual(下面单独介绍)
 
-# Arch
-sudo pacman -S sdl2 libpng zlib openal mesa
-```
+- Optimization of skin
 
-```
-cd handheld/project/linux
-make -j$(nproc)
-./minecraftpe
-```
+- Sneak button on touch mode, similar to MCPE 0.12 and later
 
----
+- A debug screen (F3), open to both touch and keyboard mode
 
-### Windows
+### Optimizations
 
-Open `handheld/project/x86/MinecraftWin32.sln` in **Visual Studio** for the
-working x86 build. The x64 project is at
-`handheld/project/x64/MinecraftWin64.sln`; it is intentionally not buildable
-until matching x64 dependencies have been added.
+I've made several optimizations based on MCPE0.6.1 and Project B.
 
-Dependencies expected by the project (install via [vcpkg](https://vcpkg.io) or manually):
-- [SDL2](https://libsdl.org) — windowing and input
-- [GLEW](https://glew.sourceforge.net) — OpenGL extension loading
-- [OpenAL Soft](https://openal-soft.org) — audio
+- Fixing the issue of no sound in Project B
 
-Build the `minecraft` configuration in Release or Debug mode.
+- Transform Graphic API from PowerVR OpenGL ES emulation to Native WGL-based desktop OpenGL rendering
 
----
+- Recover the touch screen control mode on win32 comparing to Project B
 
-### Raspberry Pi
+- Keep the keyboard and mouse control mode from Project B. Players can switch their input mode between touch and keyboard
 
-Uses SDL 1.2 and GLES 1.x via the Broadcom VideoCore headers (`/opt/vc/`).
+- Immobilize the mouse to crosshair and make it easier to move viewing angle on keyboard mode
 
-```
-cd handheld/project/raspberry
-make -j4
-./minecraftpe
-```
+- Solving the problem of mistakenly breaking blocks on touch/keyboard mode
 
-Requires the legacy GL driver (`sudo raspi-config` > Advanced > GL Driver > Legacy).
+- Solving the problem of cannot place blocks in some situations on touch/keyboard mode
+
+- Highlight reaction when mouse or finger moves to a button
+
+- Java Edition style button on keyboard mode
+
+- Original input textbox, so players can input world name, seed and player name
+
+- More options for GUI and D-Pad size
+
+- A brand new welcome page, allowing players to choose their input mode and GUI size
+
+- Recover the ability to eat on keyboard mode, comparing to Project B
+
+- Fix the bug of mobs hardly spawn at night in infinite world, comparing to Project B
+
+- Adding running in creative mode, but not survival mode for gaming balance
+
+- Fixing the bug of random chunk's feature (trees and snow) cannot be saved, which mostly affect infinite world
+
+- Adding the shortcut of F1 (Hide HUD) and F5 (switch to third-person view) on keyboard mode
+
+### Sky World
+
+### Java Beta Visual
 
 ---
 
-## Controls
+# Building
 
-### Desktop (macOS / Linux / Windows)
-
-| Key / Action | Function |
-|---|---|
-| W A S D | Move |
-| Space | Jump |
-| Left Shift | Sneak |
-| Left click | Mine / Attack |
-| Right click | Place block / Interact |
-| 1 - 9 | Select hotbar slot |
-| Scroll wheel | Scroll hotbar |
-| E | Open inventory |
-| F | Toggle fly (Creative) |
-| T | Toggle third-person view |
-| Escape | Pause / back |
-
-The mouse is captured on entering a world. Move the mouse to look around.
-
-### Android
-
-Standard Minecraft PE touchscreen controls: virtual d-pad for movement, swipe to look, tap to mine/place, on-screen buttons for jump and inventory.
+(待补充)
 
 ---
 
-## Save locations
+# Future plans
 
-| Platform | Path |
-|---|---|
-| macOS | `~/Library/Application Support/minecraft/` |
-| Linux | `~/.local/share/minecraft/` (or `$XDG_DATA_HOME/minecraft/`) |
-| Windows | `%APPDATA%\minecraft\` |
-| Android | `/sdcard/games/minecraftpe/` |
+- Chinese support
 
----
+- Better saving world
 
-## Infinite world fixes
+- Converter for Infinite and Sky world, so they can be opened in later versions of original MCPE
 
-`WorldType::Infinite`, `RandomLevelSource`, and all the selection UI existed in the original leaked source. The world type was always selectable at world creation — it just had several bugs that made it crash or behave incorrectly. These are bugfixes, not new features. All apply to every platform.
-
-- **Missing faces at the old world border** — `Tile::shouldRenderFace` had hardcoded guards that suppressed faces at x/z = −1 and 256. Removed; finite worlds still suppress those faces correctly via `isSolidRender()` on `EmptyLevelChunk`.
-- **Cannot interact with blocks beyond x/z = 255** — `Level::clip()` raycasting had a bounds guard clamped to `LEVEL_WIDTH`. Now bypassed for infinite worlds.
-- **Player shaking when crossing x/z = 256** — `Level::tick(Entity*)` skipped the entity physics tick when `hasChunksAt()` returned false for any chunk within a 32-block radius. In infinite worlds those chunks simply hadn't been generated yet, causing alternating freeze/run frames. The check is now bypassed for infinite worlds where chunks are always generated on demand.
-- **Player spawning underground or at wrong position** — `setInitialSpawn()` and `validateSpawn()` found a valid x/z but left ySpawn at 64, potentially inside terrain. Both now call `getTopTileY()` to place the spawn on the surface. Infinite worlds start the search at (8, 8) instead of (0, 0) to avoid chunk-corner physics edge cases.
-- **Player position reset on world reload** — `readPlayerData` clamped x/z to `[0.5, 255.5]` unconditionally, snapping the player back to the old world boundary on every load. Clamping is now skipped for infinite worlds.
-- **Multi-region chunk storage** — The original `ExternalFileLevelStorage` used a single `RegionFile` (one `chunks.dat`). Infinite worlds need one region file per 32×32 chunk area. A `regionFiles` map keyed on region coordinates now routes each chunk to its correct file.
-- **Chunk boundary faces between new and existing chunks** — When a newly generated chunk is loaded next to an already-rendered chunk, the shared face wasn't rebuilt. `ChunkCache::getChunk` now calls `level->setTilesDirty()` after loading to mark the boundary dirty.
-
----
-
-## iOS modernizations
-
-The iOS port has been migrated from OpenGL ES 1.x (fixed-function) to OpenGL ES 2.0 (programmable shaders) via MetalANGLE:
-
-- **MetalANGLE GLES2 backend** — replaces the deprecated OpenGL ES framework (removed in iOS 17) with MetalANGLE's Metal-backed GLES2 context (`MGLContext`, `MGLKView`).
-- **Custom GLSL ES 1.00 shader** — single vertex/fragment shader pair handles texturing, per-vertex color, alpha testing, and fog (linear/exp/exp2) via uniforms.
-- **Software matrix stack** (`MatrixStack.h`) — CPU-side replacement for all GLES1 matrix operations (`glPushMatrix`, `glTranslatef`, `glRotatef`, `glScalef`, `glOrthof`, etc.) with lazy MVP computation.
-- **Macro redirect layer** — all GLES1 fixed-function calls in the shared codebase are transparently redirected to shader uniforms, matrix stack methods, or no-ops via preprocessor macros in `gles.h`. No changes needed to game logic code.
-- **Alpha compositing fix** — dedicated mini-shader writes alpha=1.0 to the framebuffer after each frame without touching RGB, preventing transparent pixels from showing the UIKit background.
-- **Create world dialog** — programmatic UIKit layout with world name, seed, game mode toggle, and world type toggle (Old 256x256 / Infinite). Scales to any screen size.
-
----
-
-## Android modernizations
-
-The Android port has been updated for modern devices (Android 10–14+):
-
-- **Immersive fullscreen** — navigation bar and status bar are hidden using `SYSTEM_UI_FLAG_IMMERSIVE_STICKY`. Automatically restored on focus regain. No more UI elements hidden behind system bars.
-- **Correct GUI scaling** — screen dimensions account for system UI insets so touch targets and UI elements scale properly on all screen sizes.
-- **Unified multitouch system** — touch input feeds exclusively through `Multitouch`. Legacy `Mouse` is auto-mirrored from Multitouch pointer 0 via `Multitouch::feed()` so GUI code (menus, sliders, scrolling lists) works transparently.
-- **Accurate touch positions** — `MouseDevice::feed()` updates position on all event types (DOWN, UP, MOVE), not just MOVE. Fixes stale coordinates when tapping after holding.
-- **Secondary finger tap support** — `Mouse::feedEventOnly()` adds secondary finger taps to the Mouse event queue without corrupting button state, so tapping inventory while holding movement works correctly.
-- **Gesture cancellation** — `AMOTION_EVENT_ACTION_CANCEL` releases all pointers to prevent phantom stuck touches on dialog open or focus loss.
-- **Storage permissions** — runtime permission request for `WRITE_EXTERNAL_STORAGE` (API 23–29) and `MANAGE_EXTERNAL_STORAGE` (API 30+). Manifest includes `requestLegacyExternalStorage` for Android 10.
-- **Thread safety** — detached threads (`PTHREAD_CREATE_DETACHED`) are no longer joined in `CThread` destructor, fixing SIGABRT on world generation.
-- **Dialog crash fix** — removed `showSoftInput(getCurrentFocus())` in `onDialogCompleted` that caused NPE when focus was null after dialog dismiss.
-- **Touchscreen detection** — `supportsTouchscreen()` returns true for all non-Xperia Play devices.
-- **World type in create world dialog** — added `WorldTypeButton` toggle (Old 256x256 / Infinite) to the native create world layout, matching iOS.
-
----
-
-## Architecture notes
-
-### Input system
-
-The input system has two layers:
-
-- **`Multitouch`** — tracks up to 12 independent touch pointers. Each pointer is a `TouchPointer` (typedef of `MouseDevice`). Used by `TouchscreenInput::tick()` for in-game controls (d-pad, look, jump, inventory).
-- **`Mouse`** — single-pointer legacy system. On Android, auto-mirrored from Multitouch pointer 0. On desktop, fed directly from SDL2 events. Used by GUI code (`Screen::mouseEvent()`, `Slider`, `ScrollingPane`, `Gui::handleClick`).
-
-On Android, `Multitouch::feed()` for pointer 0 calls `Mouse::feed()`. Button events from other pointers use `Mouse::feedEventOnly()` to add events to the queue without changing button state or position.
-
-### Chunk storage (infinite worlds)
-
-`ExternalFileLevelStorage` maintains a map of `RegionFile*` keyed on `(regionX, regionZ)`. Each region covers 32×32 chunks. `getOrOpenRegion(cx, cz)` computes the region coordinates and opens `r.<rx>.<rz>.mcr` on first access. This mirrors the region file layout used by Minecraft Java Edition alpha/beta.
-
-### Platform abstraction
-
-Each platform has:
-- `main_<platform>.h` — entry point, window creation, event loop
-- `AppPlatform_<platform>.h` — platform services (texture loading, screen size, paths)
-
-### Preprocessor defines
-
-| Define | Meaning |
-|---|---|
-| `ANDROID` | Android target |
-| `MACOS` | macOS desktop (distinct from iOS, which also defines `__APPLE__`) |
-| `LINUX` | Linux desktop |
-| `NO_EGL` | Skip EGL calls (auto-defined for `__APPLE__` and `LINUX` in `App.h`) |
-| `POSIX` | POSIX APIs available |
-
----
-
-## Bug fixes
-
-All fixes are in shared source and apply to every platform unless noted.
-
-| Bug | Fix |
-|---|---|
-| Missing block faces at old world border (x/z = ±256) | Removed hardcoded face suppression guards in `Tile::shouldRenderFace` |
-| Cannot mine/place blocks beyond x/z = 255 | `Level::clip()` raycasting guard now bypassed for infinite worlds |
-| Player shakes when crossing x/z = 256 | `Level::tick(Entity*)` `hasChunksAt` check skipped for infinite worlds |
-| Player spawns underground in infinite world | `setInitialSpawn` / `validateSpawn` now call `getTopTileY()` to find surface Y |
-| Player teleports to x/z = 255 on world reload | `readPlayerData` position clamping skipped for infinite worlds |
-| Chunk boundary faces missing between old and new chunks | `ChunkCache::getChunk` calls `setTilesDirty()` after loading a new chunk |
-| Entity frustum culling pop-out at screen edges | Entity bounding boxes expanded by 0.5 before frustum test in `LevelRenderer` |
-| Renderer singleton memory leaks on exit | Cleanup code enabled for all non-Android / non-server platforms in `NinecraftApp` |
-| Heap buffer overflow on infinite world creation | Stale object files from header change; Makefile now uses `-MMD -MP` dependency tracking |
-| Textures missing on desktop (macOS/Linux) | `glEnable2`/`glDisable2` now route through shader wrapper to update `useTexture` uniform |
-| Blocks invisible on desktop with VBO rendering | `RenderList::renderChunks()` now enables `GL_VERTEX_ARRAY` client state before drawing |
-| GUI feedback ring not rendering on GLES2 | Replaced VBO `drawArrayVT` calls with immediate Tesselator geometry (no `GL_TRIANGLE_FAN`) |
-| Scrollable options sidebar overflows on small screens | Options sidebar and content pane now scissor-clipped with drag scrolling and inertia |
-| Pending tick stalls on large infinite worlds | `tickPendingTicks` now budgets 5ms per game tick to prevent frame drops |
-
----
-
-## CI
-
-GitHub Actions CI builds four targets: macOS, Linux, Android (NDK r16b), and dedicated server. See `.github/workflows/ci.yml`.
+- UWP version

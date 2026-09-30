@@ -1256,6 +1256,7 @@ bool Minecraft::supportNonTouchScreen() {
 }
 void Minecraft::init()
 {
+	MCPE_EXIT_TRACE("Minecraft::init begin");
 	options.minecraft = this;
 	_supportsNonTouchscreen = !platform()->supportsTouchscreen();
 #ifdef WIN32
@@ -1263,37 +1264,50 @@ void Minecraft::init()
 	_supportsNonTouchscreen = true;
 #endif
 	options.initDefaultValues();
+	MCPE_EXIT_TRACE("Minecraft::init after options");
 #ifndef STANDALONE_SERVER
 	checkGlError("Init enter");
+	MCPE_EXIT_TRACE("Minecraft::init before Textures");
 
 	LOGI("IS TOUCHSCREEN? %d\n", options.useTouchScreen);
 
 	textures = new Textures(&options, platform());
+	MCPE_EXIT_TRACE("Minecraft::init after Textures constructor");
 	// These are Java Beta's climate lookup tables, not render textures.  Keep
 	// a CPU-side copy so chunk tinting works on every graphics backend.
 	TextureId grassColorId = textures->loadTexture("misc/grasscolor.png");
+	MCPE_EXIT_TRACE("Minecraft::init after grass color");
 	const TextureData* grassColor = textures->getTemporaryTextureData(grassColorId);
 	if (grassColor) GrassColor::init(grassColor->data, grassColor->w, grassColor->h);
 	TextureId foliageColorId = textures->loadTexture("misc/foliagecolor.png");
+	MCPE_EXIT_TRACE("Minecraft::init after foliage color");
 	const TextureData* foliageColor = textures->getTemporaryTextureData(foliageColorId);
 	if (foliageColor) FoliageColor::init(foliageColor->data, foliageColor->w, foliageColor->h);
 	textures->addDynamicTexture(new WaterTexture());
 	textures->addDynamicTexture(new WaterSideTexture());
 	gui.texturesLoaded(textures);
+	MCPE_EXIT_TRACE("Minecraft::init after gui textures");
 
 	levelRenderer = new LevelRenderer(this);
+	MCPE_EXIT_TRACE("Minecraft::init after LevelRenderer");
 	gameRenderer = new GameRenderer(this);
+	MCPE_EXIT_TRACE("Minecraft::init after GameRenderer");
 	particleEngine = new ParticleEngine(level, textures);
+	MCPE_EXIT_TRACE("Minecraft::init after ParticleEngine");
 
 	// Platform specific initialization here
 	font = new Font(&options, "font/default8.png", textures);
+	MCPE_EXIT_TRACE("Minecraft::init after Font");
 
 	_perfRenderer = new PerfRenderer(this, font);
+	MCPE_EXIT_TRACE("Minecraft::init after PerfRenderer");
 
 	checkGlError("Init complete");
+	MCPE_EXIT_TRACE("Minecraft::init after graphics objects");
 #endif
 
 	user = new User("TestUser", "");
+	MCPE_EXIT_TRACE("Minecraft::init after User");
 	setIsCreativeMode(false); // false means it's Survival Mode
 
 #ifdef ANDROID
@@ -1313,6 +1327,7 @@ void Minecraft::init()
 	// installations keep their current setup and never see the welcome page.
 	const bool firstRun = !options.hasSavedOptions();
 	reloadOptions();
+	MCPE_EXIT_TRACE("Minecraft::init after reloadOptions");
 	if (firstRun) {
 		setScreen(new WelcomeScreen());
 	}

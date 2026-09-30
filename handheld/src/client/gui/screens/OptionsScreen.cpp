@@ -236,8 +236,8 @@ void OptionsScreen::generateOptionScreens() {
 		.addOptionItem(&Options::Option::DPAD_SIZE, minecraft)
 		.addOptionItem(&Options::Option::LEFT_HANDED, minecraft)
 		.addOptionItem(&Options::Option::USE_TOUCH_JOYPAD, minecraft)
-		.addDisabledItem("Vibrate on Destroy", "Unavailable")
-		.addOptionItem(&Options::Option::INVERT_MOUSE, minecraft);
+		.addOptionItem(&Options::Option::INVERT_MOUSE, minecraft)
+		.addDisabledItem("Vibrate on Destroy", "Unavailable");
 
 	// Graphics
 	optionPanes[2]->createOptionsGroup("options.group.graphics")
@@ -258,16 +258,21 @@ void OptionsScreen::generateOptionScreens() {
 	optionPanes[4]->createOptionsGroup("options.category.additional")
 		.addOptionItem(&Options::Option::INFINITE_WORLDS, minecraft)
 		.addOptionItem(&Options::Option::SKIN_MENU, minecraft)
+		.addDescription("Re-enter Options to open Skin Settings")
 		.addOptionItem(&Options::Option::TOUCH_SNEAK, minecraft)
 		.addOptionItem(&Options::Option::BETA_VISUALS, minecraft)
 		.addOptionItem(&Options::Option::DEBUG_SCREEN, minecraft)
 		.addDisabledItem("Chinese", "Coming soon");
 
 	// Skin: choose the model explicitly; imported skins are always 64x64.
-	optionPanes[5]->createOptionsGroup("options.category.skin")
+	OptionsGroup& skinGroup = optionPanes[5]->createOptionsGroup("options.category.skin");
+	skinGroup
 		.addOptionItem(&Options::Option::SKIN_ARM_TYPE, minecraft)
+		.addDescription("Choose Classic or Slim model")
 		.addImportSkinItem(minecraft)
-		.addClearSkinCacheItem(minecraft);
+		.addDescription("Use a 64x64 PNG skin")
+		.addClearSkinCacheItem(minecraft)
+		.addDescription("Restart the game to apply skin changes");
 // 	int mojangGroup = optionPanes[0]->createOptionsGroup("Mojang");
 // 	static const int arr[] = {5,4,3,15};
 // 	std::vector<int> vec (arr, arr + sizeof(arr) / sizeof(arr[0]) );

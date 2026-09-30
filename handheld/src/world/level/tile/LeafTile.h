@@ -10,6 +10,9 @@
 #include "../../item/Item.h"
 #include "../../item/ItemInstance.h"
 #include "../FoliageColor.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 class Entity;
 
@@ -57,9 +60,16 @@ public:
         }
 
 		if (Tile::useBetaVisuals()) {
+			// Diagnostic for the Sky dimension: Java Beta's fixed climate
+			// (temperature=0.5, downfall=0.0) samples foliagecolor.png at
+			// (127,255), which is 0x87A353 in the bundled palette.  Returning
+			// it directly lets us distinguish a climate-sampling problem from
+			// a later renderer/texture tint override.
 			level->getBiomeSource()->getBiomeBlock(x, z, 1, 1);
-			return FoliageColor::get(level->getBiomeSource()->temperatures[0],
-				level->getBiomeSource()->downfalls[0]);
+			float temperature = level->getBiomeSource()->temperatures[0];
+			float downfall = level->getBiomeSource()->downfalls[0];
+			int color = FoliageColor::get(temperature, downfall);
+			return color;
 		}
 		return FoliageColor::getDefaultColor();
     }
@@ -186,7 +196,15 @@ public:
         return !allowSame;
     }
 
-    int getTexture(int face, int data) {
+	int getTexture(int face, int data) {
+		if (Tile::useBetaVisuals()) {
+			int type = data & LEAF_TYPE_MASK;
+			// Beta foliage uses the grayscale leaf tiles added to the two
+			// otherwise-unused terrain slots 142 and 143. PE visuals keep
+			// using the original green atlas tile below.
+			if (type == NORMAL_LEAF) return 142;
+			if (type == BIRCH_LEAF) return 143;
+		}
         if ((data & LEAF_TYPE_MASK) == EVERGREEN_LEAF) {
 			return (this == Tile::leaves)?	tex + 5 * 16
 										:	tex -     16;

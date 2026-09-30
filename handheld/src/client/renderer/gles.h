@@ -148,7 +148,13 @@
 	#include <GL/glew.h>
 	#include <GL/GL.h>
 
+	#if !defined(_ARM_) && !defined(_M_ARM)
 	#define USE_VBO
+	#endif
+// ARM32's WGL/GLEW layer does not expose the buffer-object entry points used
+// by the VBO path.  Keep the legacy display-list path on that target: the
+// tessellator records the geometry once with glNewList/glEndList and frames
+// only issue glCallLists, avoiding per-frame client-array uploads.
 	#define glFogx(a,b)             glFogi(a,b)
 	#define glOrthof(a,b,c,d,e,f)   glOrtho(a,b,c,d,e,f)
 	#define glClearDepthf(x)        glClearDepth(x)
@@ -259,6 +265,13 @@ void drawArrayVTC(int bufferId, int vertices, int vertexSize = 24);
 #ifndef drawArrayVTC_NoState
 void drawArrayVTC_NoState(int bufferId, int vertices, int vertexSize = 24);
 #endif
+#else
+// ARM32 WGL may not expose GL_ARB_vertex_buffer_object.  Keep the symbols
+// available for legacy callers while the renderer uses its client-memory path.
+void drawArrayVT(int bufferId, int vertices, int vertexSize = 24, unsigned int mode = GL_TRIANGLES);
+void drawArrayVTC(int bufferId, int vertices, int vertexSize = 24);
+#define drawArrayVT_NoState drawArrayVT
+#define drawArrayVTC_NoState drawArrayVTC
 #endif
 
 void glInit();

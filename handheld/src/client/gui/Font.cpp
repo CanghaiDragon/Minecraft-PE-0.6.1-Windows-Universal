@@ -154,6 +154,12 @@ void Font::draw( const char* str, float x, float y, int color, bool darken )
 {
 #ifdef USE_VBO
 	drawSlow(str, x, y, color, darken);
+#else
+	// The legacy display-list path is used when VBOs are unavailable (ARM32
+	// WGL). Keep the C-string overload equivalent to the std::string overload;
+	// the old conditional body silently discarded all C-string text.
+	if (str)
+		draw(std::string(str), x, y, color, darken);
 #endif
 }
 

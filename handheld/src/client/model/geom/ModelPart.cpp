@@ -46,7 +46,9 @@ void ModelPart::_init() {
 	yTexSize = 32;
 
 	vboId = 0;
+#ifdef USE_VBO
 	glGenBuffers2(1, &vboId);
+#endif
 }
 
 void ModelPart::setModel(Model* model) {

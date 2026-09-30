@@ -1,51 +1,59 @@
-# macOS / Finder
+# Operating-system files
 .DS_Store
 **/.DS_Store
-.AppleDouble
-.LSOverride
-
-# Windows
 Thumbs.db
 Desktop.ini
 
-# Editor / IDE
+# Editors and local settings
 .idea/
 .vscode/
+**/.vs/
+*.user
+*.suo
 *.swp
 *.swo
 *~
 
-# Logs
+# Logs and generated compiler metadata
 *.log
+*.tlog/
+*.lastbuildstate
+*.obj
+*.iobj
+*.ipdb
+*.ilk
+*.pch
+*.idb
+*.pdb
+*.ipch/
+*.vsidx
+*.VC.db
+*.VC.opendb
+*.recipe
+*.map
 
-# Build outputs — compiled objects and binaries
-handheld/project/macos/obj/
-handheld/project/macos/minecraftpe
-handheld/project/linux/obj/
-handheld/project/linux/minecraftpe
-handheld/project/raspberry/obj/
-handheld/project/raspberry/minecraftpi
-handheld/project/raspberry/libRakNet.so
-handheld/project/raspberry/libRakNet_static.a
-handheld/project/dedicated_server/obj/
-handheld/project/dedicated_server/minecraft_server
-handheld/project/x86/obj/
+# Windows Visual Studio build output
 handheld/project/x86/Debug/
 handheld/project/x86/Release/
-handheld/project/x86/.vs/
 handheld/project/x86/MinecraftWin32/
-handheld/project/x86/*.user
-handheld/project/x64/obj/
 handheld/project/x64/Debug/
 handheld/project/x64/Release/
-handheld/project/x64/.vs/
 handheld/project/x64/MinecraftWin64/
-handheld/project/x64/*.user
+handheld/project/x64/x64/
+handheld/project/arm64/Debug/
+handheld/project/arm64/Release/
+handheld/project/arm64/ARM64/
+handheld/project/arm64/MinecraftWinARM64/
+handheld/project/arm/Debug/
+handheld/project/arm/Release/
+handheld/project/arm/ARM/
+handheld/project/arm/MinecraftWinARM/
 
-# Android build
-handheld/project/android/.gradle/
-handheld/project/android/build/
-handheld/project/android/.cxx/
-handheld/project/android/local.properties
-handheld/project/android/jni/obj/
-handheld/project/android/libs/
+# Generated runtime binaries; keep tracked resources and world saves
+Game/**/MinecraftWin*.exe
+Game/**/MinecraftWin*.pdb
+Game/**/*.ilk
+Game/**/*.iobj
+Game/**/*.obj
+Game/**/*.dll
+Game/**/*.lib

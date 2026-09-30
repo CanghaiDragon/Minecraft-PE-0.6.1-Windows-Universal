@@ -49,9 +49,15 @@ Gui::Gui(Minecraft* minecraft)
 	_feedbackRadius(0),
 	_feedbackRadiusInner(0)
 {
+#ifdef USE_VBO
 	glGenBuffers2(1, &_inventoryRc.vboId);
 	glGenBuffers2(1, &rcFeedbackInner.vboId);
 	glGenBuffers2(1, &rcFeedbackOuter.vboId);
+#else
+	_inventoryRc.vboId = 0;
+	rcFeedbackInner.vboId = 0;
+	rcFeedbackOuter.vboId = 0;
+#endif
 	//Gui::InvGuiScale = 1.0f / (int) (3 * Minecraft::width / 854);
 }
 
@@ -60,7 +66,9 @@ Gui::~Gui()
 	if (_slotFont)
 		delete _slotFont;
 
+#ifdef USE_VBO
 	glDeleteBuffers(1, &_inventoryRc.vboId);
+#endif
 }
 
 void Gui::render(float a, bool mouseFree, int xMouse, int yMouse) {

@@ -115,11 +115,16 @@ public:
 		if (!fits(x, z)) return;
         LevelChunk* chunk = getChunk(x, z);
         if (!chunk->terrainPopulated) {
-            chunk->terrainPopulated = true;
             if (source != NULL) {
                 source->postProcess(parent, x, z);
 				chunk->clearUpdateMap();
             }
+			// Mark the chunk populated only after all terrain features (trees,
+			// snow, ores, etc.) have been generated.  Post-processing modifies
+			// blocks outside the initial terrain pass, so force the completed
+			// result to be written on the next save.
+			chunk->terrainPopulated = true;
+			chunk->markUnsaved();
         }
     }
 

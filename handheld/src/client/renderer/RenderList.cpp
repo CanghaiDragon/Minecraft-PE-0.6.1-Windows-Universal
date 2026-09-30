@@ -51,10 +51,10 @@ void RenderList::render() {
 		glPushMatrix2();
 		glTranslatef2(-xOff, -yOff, -zOff);
 
-		#ifndef USE_VBO
-			glCallLists(bufferLimit, GL_UNSIGNED_INT, lists);
-		#else
+		#if defined(USE_VBO) || defined(MCPE_CLIENT_MESH)
 			renderChunks();
+		#else
+			glCallLists(bufferLimit, GL_UNSIGNED_INT, lists);
 		#endif/*!USE_VBO*/
 
 		glPopMatrix2();
@@ -74,7 +74,18 @@ void RenderList::renderChunks() {
 	for (int i = 0; i < bufferLimit; ++i) {
 		RenderChunk& rc = rlists[i];
 
+		#if defined(MCPE_CLIENT_MESH)
+			if (!rc.clientData || rc.vertexCount <= 0) continue;
+			glVertexPointer2(3, GL_FLOAT, Stride, rc.clientData);
+			glTexCoordPointer2(2, GL_FLOAT, Stride,
+				(const GLvoid*)((const unsigned char*)rc.clientData + 3 * 4));
+			glColorPointer2(4, GL_UNSIGNED_BYTE, Stride,
+				(const GLvoid*)((const unsigned char*)rc.clientData + 5 * 4));
+			glDrawArrays2(GL_TRIANGLES, 0, rc.vertexCount);
+			continue;
+		#else
 		glBindBuffer2(GL_ARRAY_BUFFER, rc.vboId);
+		#endif
 
 #if defined(__APPLE__) && !defined(MACOS)
 		// iOS GLES2: vertex attrib pointers

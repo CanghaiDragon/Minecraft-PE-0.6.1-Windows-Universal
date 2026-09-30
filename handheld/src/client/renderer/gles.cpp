@@ -1,4 +1,6 @@
 #include "gles.h"
+#include "../../platform/ExitTrace.h"
+#include <cstring>
 
 // Un-define macros inside this translation unit so we can call real GL functions
 #if defined(__APPLE__) && !defined(MACOS)
@@ -497,8 +499,42 @@ void __gluMakeIdentityf(GLfloat m[16]) {
 void glInit()
 {
 #if !defined(OPENGL_ES) && !defined(MACOS) && !defined(LINUX)
+	MCPE_EXIT_TRACE("glInit: before glewInit glGenBuffers=%p", (void*)__glewGenBuffers);
 	GLenum err = glewInit();
 	printf("Err: %d\n", err);
+	MCPE_EXIT_TRACE("glInit: glewInit result=%u glGenBuffers=%p",
+		(unsigned)err, (void*)__glewGenBuffers);
+
+	// ARM32 currently falls back to the legacy display-list renderer because
+	// glGenBuffers was observed to be null.  Record the actual driver
+	// capabilities before deciding whether a VBO path is possible.  The ARB
+	// spellings are checked separately because older WGL drivers expose those
+	// entry points without the core names.
+	const GLubyte* glVersion = glGetString(GL_VERSION);
+	const GLubyte* glVendor = glGetString(GL_VENDOR);
+	const GLubyte* glRenderer = glGetString(GL_RENDERER);
+	const GLubyte* glExtensions = glGetString(GL_EXTENSIONS);
+	MCPE_EXIT_TRACE("glCaps: version=%s vendor=%s renderer=%s",
+		glVersion ? (const char*)glVersion : "<null>",
+		glVendor ? (const char*)glVendor : "<null>",
+		glRenderer ? (const char*)glRenderer : "<null>");
+	MCPE_EXIT_TRACE("glCaps: glGenBuffers=%p glBindBuffer=%p glBufferData=%p",
+		(void*)__glewGenBuffers, (void*)__glewBindBuffer, (void*)__glewBufferData);
+#if defined(WIN32) && defined(WIN32_WGL)
+	PROC arbGen = wglGetProcAddress("glGenBuffersARB");
+	PROC arbBind = wglGetProcAddress("glBindBufferARB");
+	PROC arbData = wglGetProcAddress("glBufferDataARB");
+	MCPE_EXIT_TRACE("glCaps: ARB glGenBuffers=%p glBindBuffer=%p glBufferData=%p",
+		(void*)arbGen, (void*)arbBind, (void*)arbData);
+#endif
+	if (glExtensions) {
+		char extensionPreview[513];
+		strncpy(extensionPreview, (const char*)glExtensions, sizeof(extensionPreview) - 1);
+		extensionPreview[sizeof(extensionPreview) - 1] = '\0';
+		MCPE_EXIT_TRACE("glCaps: extensions(first512)=%s", extensionPreview);
+		MCPE_EXIT_TRACE("glCaps: GL_ARB_vertex_buffer_object=%d",
+			strstr((const char*)glExtensions, "GL_ARB_vertex_buffer_object") != NULL ? 1 : 0);
+	}
 #endif
 
 #if defined(__APPLE__) && !defined(MACOS)
@@ -517,6 +553,14 @@ void glInit()
 }
 
 void anGenBuffers(GLsizei n, GLuint* buffers) {
+	#if !defined(OPENGL_ES) && !defined(MACOS) && !defined(LINUX)
+	static int traceBudget = 8;
+	if (traceBudget > 0) {
+		--traceBudget;
+		MCPE_EXIT_TRACE("anGenBuffers: n=%d buffers=%p glGenBuffers=%p",
+			(int)n, (void*)buffers, (void*)__glewGenBuffers);
+	}
+	#endif
 	glGenBuffers(n, buffers);
 }
 
@@ -604,6 +648,24 @@ void drawArrayVTC_NoState(int bufferId, int vertices, int vertexSize /* = 24 */)
 #endif // iOS vs non-iOS
 
 #endif // USE_VBO
+
+#ifndef USE_VBO
+// The non-VBO renderer submits client-side vertex arrays from its own
+// tesselator.  These compatibility entry points are retained for old sky and
+// item callers that still pass a buffer ID; they intentionally do nothing.
+void drawArrayVT(int bufferId, int vertices, int vertexSize, unsigned int mode) {
+	(void)bufferId;
+	(void)vertices;
+	(void)vertexSize;
+	(void)mode;
+}
+
+void drawArrayVTC(int bufferId, int vertices, int vertexSize) {
+	(void)bufferId;
+	(void)vertices;
+	(void)vertexSize;
+}
+#endif
 
 
 //

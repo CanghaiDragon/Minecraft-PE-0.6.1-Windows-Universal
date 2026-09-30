@@ -43,7 +43,9 @@ BiomeSource::BiomeSource( Level* level )
 	noiseMap = new PerlinSimplexNoise(&rndNoise, 2);
 
 	biomes = new Biome*[16*16];
+	lenBiomes = 16 * 16;
 	temperatures = new float[16*16];
+	lenTemperatures = 16 * 16;
 }
 
 BiomeSource::~BiomeSource() {
@@ -73,6 +75,11 @@ float BiomeSource::getTemperature(int x, int z) {
 	// This is intentionally the direct 0.5-offset noise sample used by
 	// Java Beta World.getSkyColor, not getTemperatureBlock's biome-adjusted
 	// climate value.
+	if (lenTemperatures < 1) {
+		delete[] temperatures;
+		temperatures = new float[1];
+		lenTemperatures = 1;
+	}
 	temperatures = temperatureMap->getRegion(temperatures, x, z, 1, 1,
 		tempScale, tempScale, 0.5f);
 	return temperatures[0];
@@ -95,9 +102,31 @@ Biome** BiomeSource::getBiomeBlock( Biome** biomes__, int x, int z, int w, int h
 	//	lenBiomes = size;
 	//}
 
-	temperatures = temperatureMap->getRegion(temperatures, x, z, w, w, tempScale, tempScale, 0.25f);
-	downfalls = downfallMap->getRegion(downfalls, x, z, w, w, downfallScale, downfallScale, 0.3333f);
-	noises = noiseMap->getRegion(noises, x, z, w, w, noiseScale, noiseScale, 0.588f);
+	const int size = w * h;
+	if (lenTemperatures < size) {
+		delete[] temperatures;
+		temperatures = new float[size];
+		lenTemperatures = size;
+	}
+	if (lenDownfalls < size) {
+		delete[] downfalls;
+		downfalls = new float[size];
+		lenDownfalls = size;
+	}
+	if (lenNoises < size) {
+		delete[] noises;
+		noises = new float[size];
+		lenNoises = size;
+	}
+	if (lenBiomes < size) {
+		delete[] biomes;
+		biomes = new Biome*[size];
+		lenBiomes = size;
+	}
+
+	temperatures = temperatureMap->getRegion(temperatures, x, z, w, h, tempScale, tempScale, 0.25f);
+	downfalls = downfallMap->getRegion(downfalls, x, z, w, h, downfallScale, downfallScale, 0.3333f);
+	noises = noiseMap->getRegion(noises, x, z, w, h, noiseScale, noiseScale, 0.588f);
 
 	int pp = 0;
 	for (int yy = 0; yy < w; yy++) {
@@ -136,6 +165,17 @@ float* BiomeSource::getTemperatureBlock( /*float* temperatures__, */int x, int z
 	//	lenTemperatures = size;
 	//}
 
+	const int size = w * h;
+	if (lenTemperatures < size) {
+		delete[] temperatures;
+		temperatures = new float[size];
+		lenTemperatures = size;
+	}
+	if (lenNoises < size) {
+		delete[] noises;
+		noises = new float[size];
+		lenNoises = size;
+	}
 	float * ot = temperatures;
 	temperatures = temperatureMap->getRegion(temperatures, x, z, w, h, tempScale, tempScale, 0.25f);
 	noises = noiseMap->getRegion(noises, x, z, w, h, noiseScale, noiseScale, 0.588f);

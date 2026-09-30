@@ -620,7 +620,7 @@ int LevelRenderer::renderChunks( int from, int to, int layer, float alpha )
 
 	for (unsigned int i = 0; i < _renderChunks.size(); ++i) {
 		Chunk* chunk = _renderChunks[i];
-		#ifdef USE_VBO
+		#if defined(USE_VBO) || defined(MCPE_CLIENT_MESH)
 			renderList.addR(chunk->getRenderChunk(layer));
 		#else
 			renderList.add(chunk->getList(layer));
@@ -994,7 +994,10 @@ void LevelRenderer::renderBetaSky(float alpha) {
 	// intentionally disabled it, so enable it again before the sun/moon batch.
 	glEnable2(GL_TEXTURE_2D);
 	glPushMatrix2();
-	glRotatef2(level->getSunAngle(alpha) * Mth::RADDEG, 1, 0, 0);
+	// X is east/west and Z is north/south in the F3 coordinate display.
+	// Rotate the celestial path around Z so the sun rises in the east and
+	// sets in the west instead of travelling along the north/south axis.
+	glRotatef2(level->getSunAngle(alpha) * Mth::RADDEG, 0, 0, 1);
 	Tesselator& t = Tesselator::instance;
 	textures->loadAndBindTexture("terrain/sun.png");
 	t.begin();

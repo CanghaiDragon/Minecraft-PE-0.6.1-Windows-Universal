@@ -14,6 +14,7 @@ public:
 
 	GLuint vboId;
 	GLsizei vertexCount;
+	const void* clientData;
 	int id;
 	Vec3 pos;
 

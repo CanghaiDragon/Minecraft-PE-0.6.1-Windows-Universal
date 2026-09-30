@@ -19,6 +19,10 @@ class PrerenderTilesScreen: public Screen
 {
 public:
 	void init() {
+		// The screen can be initialized before a world exists (notably during
+		// ARM32 startup).  Do not construct a Player with a null Level.
+		if (minecraft == NULL || minecraft->level == NULL)
+			return;
 		Player p(minecraft->level, true);
 		Inventory _inventory(&p, true);
 		Inventory* inventory = &_inventory;

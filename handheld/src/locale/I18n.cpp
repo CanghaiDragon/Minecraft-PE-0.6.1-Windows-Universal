@@ -49,7 +49,7 @@ std::string I18n::get( const std::string& id )
 		{ "options.guiScale.medium", "Medium" },
 		{ "options.betaVisuals", "Java Beta Graphic Visual" },
 		{ "options.category.skin", "Skin" },
-		{ "options.skinMenu", "Skin Settings" },
+		{ "options.skinMenu", "Skin Settings (Re-enter Options to take effect)" },
 		{ "options.importSkin", "Import Skin" },
 		{ "options.touchSneak", "Touch Sneak" },
 		{ "options.debugScreen", "Debug Screen F3" },

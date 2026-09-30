@@ -48,11 +48,11 @@ void WelcomeScreen::setupPositions()
 	touchButton.width = keyboardButton.width = guiScaleButton.width = continueButton.width = buttonWidth;
 	touchButton.height = keyboardButton.height = guiScaleButton.height = continueButton.height = buttonHeight;
 
-	touchButton.y = 56;
-	keyboardButton.y = 88;
-	guiScaleButton.y = 146;
-	continueButton.y = 178;
-	contentHeight = continueButton.y + continueButton.height + 12;
+	touchButton.y = 66;
+	keyboardButton.y = 98;
+	guiScaleButton.y = 140;
+	continueButton.y = 172;
+	contentHeight = continueButton.y + continueButton.height + 48;
 	clampScroll();
 }
 
@@ -85,7 +85,10 @@ void WelcomeScreen::render(int xm, int ym, float a)
 	glTranslatef2(0, -scrollY, 0);
 
 	drawCenteredString(font, "Choose your controls", width / 2, 38, 0xffffff);
+	drawCenteredString(font, "Touch or keyboard/mouse controls are exclusive in a world.", width / 2, 52, 0xc0c0c0);
 	drawCenteredString(font, "Adjust interface size", width / 2, 128, 0xffffff);
+	drawCenteredString(font, "You are free to change these settings at any time in options.", width / 2, 206, 0xc0c0c0);
+	drawCenteredString(font, "Don't forget to take a look at \"Additional\" in options!", width / 2, 218, 0xc0c0c0);
 	for (unsigned int i = 0; i < buttons.size(); ++i)
 		buttons[i]->render(minecraft, hoverX, hoverY + (int)scrollY);
 

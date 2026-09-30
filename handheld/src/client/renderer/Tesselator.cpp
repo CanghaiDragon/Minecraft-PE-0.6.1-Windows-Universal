@@ -1,4 +1,5 @@
 #include "Tesselator.h"
+#include "../../platform/ExitTrace.h"
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -6,6 +7,42 @@
 Tesselator Tesselator::instance(sizeof(GLfloat) * MAX_FLOATS); // max size in bytes
 
 const int VertexSizeBytes = sizeof(VERTEX);
+
+#ifndef USE_VBO
+// ARM32 currently uses the legacy display-list path because its WGL context
+// does not expose glGenBuffers. Client-side vertex arrays are not captured
+// reliably while a display list is compiled, so emit the vertices through
+// immediate mode. These calls are recorded by glNewList/glEndList.
+static void drawClientVertices(const VERTEX* data, int vertexCount, int drawMode,
+                               bool hasTexture, bool hasColor)
+{
+    if (!data || vertexCount <= 0)
+        return;
+
+    const GLenum primitive = (drawMode == GL_QUADS) ? GL_TRIANGLES : (GLenum)drawMode;
+    glBegin(primitive);
+    for (int i = 0; i < vertexCount; ++i) {
+        const VERTEX& vertex = data[i];
+        if (hasColor) {
+            const unsigned int color = vertex.color;
+            glColor4ub((GLubyte)(color & 0xff),
+                       (GLubyte)((color >> 8) & 0xff),
+                       (GLubyte)((color >> 16) & 0xff),
+                       (GLubyte)((color >> 24) & 0xff));
+        }
+        if (hasTexture)
+            glTexCoord2f(vertex.u, vertex.v);
+        glVertex3f(vertex.x, vertex.y, vertex.z);
+    }
+    glEnd();
+    // Client-array rendering did not change the current GL color. Immediate
+    // mode does, so restore the neutral color for following textured draws
+    // that intentionally omit a per-vertex color (font glyphs, slider knobs,
+    // GUI icons, etc.).
+    if (hasColor)
+        glColor4ub(255, 255, 255, 255);
+}
+#endif
 
 Tesselator::Tesselator( int size )
 :	size(size),
@@ -49,7 +86,16 @@ Tesselator::~Tesselator()
 void Tesselator::init()
 {
 #ifndef STANDALONE_SERVER
+#ifdef USE_VBO
+	const int useVbo = 1;
+#else
+	const int useVbo = 0;
+#endif
+	MCPE_EXIT_TRACE("Tesselator::init begin USE_VBO=%d", useVbo);
+#ifdef USE_VBO
 	glGenBuffers2(vboCounts, vboIds);
+#endif
+	MCPE_EXIT_TRACE("Tesselator::init complete");
 #endif
 }
 
@@ -88,43 +134,24 @@ RenderChunk Tesselator::end( bool useMine, int bufferId )
 			bufferId = vboIds[vboId];
 		}
 #else
-		// Not using VBO - always use the next buffer object
-		bufferId = vboIds[vboId];
+		// The legacy display-list path does not use a buffer object.
+		bufferId = 0;
 #endif
 		int access = GL_STATIC_DRAW;
 		int bytes = p * sizeof(VERTEX);
+#ifdef USE_VBO
 		glBindBuffer2(GL_ARRAY_BUFFER, bufferId);
 		glBufferData2(GL_ARRAY_BUFFER, bytes, _varray, access); // GL_STREAM_DRAW
 		totalSize += bytes;
+#else
+		// Client-memory path: do not touch GL_ARRAY_BUFFER at all. The
+		// display-list-compatible immediate path below owns the vertex data.
+		(void)access;
+		(void)bytes;
+#endif
 
 #ifndef USE_VBO
-		// 0 1 2 3 4 5 6 7
-		// x y z u v c
-		if (hasTexture) {
-			glTexCoordPointer2(2, GL_FLOAT, VertexSizeBytes, (GLvoid*) (3 * 4));
-			glEnableClientState2(GL_TEXTURE_COORD_ARRAY);
-		}
-		if (hasColor) {
-			glColorPointer2(4, GL_UNSIGNED_BYTE, VertexSizeBytes, (GLvoid*) (5 * 4));
-			glEnableClientState2(GL_COLOR_ARRAY);
-		}
-		if (hasNormal) {
-			glNormalPointer(GL_BYTE, VertexSizeBytes, (GLvoid*) (6 * 4));
-			glEnableClientState2(GL_NORMAL_ARRAY);
-		}
-		glVertexPointer2(3, GL_FLOAT, VertexSizeBytes, 0);
-		glEnableClientState2(GL_VERTEX_ARRAY);
-
-		if (mode == GL_QUADS) {
-			glDrawArrays2(GL_TRIANGLES, 0, vertices);
-		} else {
-			glDrawArrays2(mode, 0, vertices);
-		}
-		//printf("drawing %d tris, size %d (%d,%d,%d)\n", vertices, p, hasTexture, hasColor, hasNormal);
-		glDisableClientState2(GL_VERTEX_ARRAY);
-		if (hasTexture) glDisableClientState2(GL_TEXTURE_COORD_ARRAY);
-		if (hasColor) glDisableClientState2(GL_COLOR_ARRAY);
-		if (hasNormal) glDisableClientState2(GL_NORMAL_ARRAY);
+		drawClientVertices(_varray, vertices, mode, hasTexture, hasColor);
 #endif /*!USE_VBO*/
 	}
 
@@ -380,12 +407,21 @@ void Tesselator::draw()
 		if (++vboId >= vboCounts)
 			vboId = 0;
 
-		int bufferId = vboIds[vboId];
+		int bufferId = 0;
+#ifdef USE_VBO
+		bufferId = vboIds[vboId];
+#endif
 
 		int access = GL_DYNAMIC_DRAW;
 		int bytes = p * sizeof(VERTEX);
+#ifdef USE_VBO
 		glBindBuffer2(GL_ARRAY_BUFFER, bufferId);
 		glBufferData2(GL_ARRAY_BUFFER, bytes, _varray, access);
+#else
+		(void)bufferId;
+		(void)access;
+		(void)bytes;
+#endif
 
 #if defined(__APPLE__) && !defined(MACOS)
 		// iOS GLES2: set up vertex attributes for shader
@@ -411,7 +447,8 @@ void Tesselator::draw()
 		// Re-enable attribs that were disabled
 		if (!hasTexture) glEnableVertexAttribArray(1);
 		if (!hasColor) glEnableVertexAttribArray(2);
-#else
+	#else
+	#ifdef USE_VBO
 		if (hasTexture) {
 			glTexCoordPointer2(2, GL_FLOAT, VertexSizeBytes, (GLvoid*) (3 * 4));
 			glEnableClientState2(GL_TEXTURE_COORD_ARRAY);
@@ -428,6 +465,9 @@ void Tesselator::draw()
 		} else {
 			glDrawArrays2(mode, 0, vertices);
 		}
+	#else
+		drawClientVertices(_varray, vertices, mode, hasTexture, hasColor);
+	#endif
 #endif
 
 		glDisableClientState2(GL_VERTEX_ARRAY);

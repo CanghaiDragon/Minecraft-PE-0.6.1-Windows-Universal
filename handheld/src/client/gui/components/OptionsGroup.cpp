@@ -8,6 +8,17 @@
 #include "../../sound/SoundEngine.h"
 
 namespace {
+class OptionsDescription : public GuiElement {
+public:
+	OptionsDescription(const std::string& text) : GuiElement(false, true, 0, 0, 24, 18), text(text) {}
+	void render(Minecraft* minecraft, int, int) {
+		int tx = x + (width - minecraft->font->width(text)) / 2;
+		minecraft->font->draw(text, (float)tx, (float)y + 4, 0xb0b0b0, false);
+	}
+private:
+	std::string text;
+};
+
 class ClearSkinCacheButton : public Touch::TButton {
 public:
 	ClearSkinCacheButton() : Touch::TButton(0, "Clear") {}
@@ -84,6 +95,12 @@ OptionsGroup& OptionsGroup::addDisabledItem(const std::string& itemLabel, const 
 	element->width = 96;
 	element->height = 20;
 	addChild(new OptionsItem(itemLabel, element));
+	setupPositions();
+	return *this;
+}
+
+OptionsGroup& OptionsGroup::addDescription(const std::string& text) {
+	addChild(new OptionsDescription(text));
 	setupPositions();
 	return *this;
 }

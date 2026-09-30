@@ -476,7 +476,7 @@ void RandomLevelSource::postProcess(ChunkSource* parent, int xt, int zt) {
 
 	//printf("Time to place features: %f. Total %f\n", et - st, totalTime);
 
-    HeavyTile::instaFall = false;
+	HeavyTile::instaFall = false;
 
 	level->isGeneratingTerrain = false;
 }

@@ -12,9 +12,14 @@
 #include "feature/SpringFeature.h"
 #include "feature/ClayFeature.h"
 #include "feature/OreFeature.h"
+#include "../../../platform/ExitTrace.h"
 #include <cstdint>
 
 namespace {
+
+// File-scope diagnostic counter: avoid ARM32 function-local static
+// initialization in SkyLevelSource::getChunk().
+static int g_skyGetChunkTraceBudget = 64;
 
 // OreFeature offsets its input height upward by up to four blocks. Keep its
 // starting coordinate below the top of the 128-block PE world.
@@ -74,6 +79,8 @@ SkyLevelSource::SkyLevelSource(Level* level, long seed, bool spawnMobs)
     lperlinNoise1(&random, 16), lperlinNoise2(&random, 16),
     perlinNoise1(&random, 8), surfaceNoise(&random, 4), forestNoise(&random, 8)
 {
+	MCPE_EXIT_TRACE("SkyLevelSource ctor complete this=%p level=%p seed=%ld spawnMobs=%d",
+		(void*)this, (void*)level, seed, spawnMobs ? 1 : 0);
 }
 
 SkyLevelSource::~SkyLevelSource() {
@@ -194,21 +201,64 @@ void SkyLevelSource::buildSurfaces(int xOffs, int zOffs, unsigned char* blocks, 
 }
 
 LevelChunk* SkyLevelSource::getChunk(int x, int z) {
-    std::pair<int, int> key(x, z);
-    std::map<std::pair<int, int>, LevelChunk*>::iterator it = chunkMap.find(key);
-    if (it != chunkMap.end()) return it->second;
+#if defined(MCPE_ARM32_SKY_GETCHUNK_NULL_TEST)
+	// Diagnostic only: return before touching the object or any member.  This
+	// separates a bad virtual call/object pointer from code inside getChunk.
+	(void)x;
+	(void)z;
+	return NULL;
+#else
+	const bool trace = g_skyGetChunkTraceBudget > 0;
+	if (trace) {
+		--g_skyGetChunkTraceBudget;
+		MCPE_EXIT_TRACE("SkyLevelSource getChunk enter this=%p level=%p x=%d z=%d",
+			(void*)this, (void*)level, x, z);
+	}
+	std::pair<int, int> key(x, z);
+	// ARM32 diagnostic: bypass the std::map cache completely.  If this
+	// removes the early crash, the failure is in the map/object layout rather
+	// than terrain generation.  This is intentionally temporary; callers may
+	// receive freshly generated chunks more than once during this test.
+	const bool bypassChunkMap = true;
+	if (!bypassChunkMap) {
+		if (trace)
+			MCPE_EXIT_TRACE("SkyLevelSource getChunk before map.find this=%p", (void*)this);
+		std::map<std::pair<int, int>, LevelChunk*>::iterator it = chunkMap.find(key);
+		if (trace)
+			MCPE_EXIT_TRACE("SkyLevelSource getChunk after map.find found=%d", it != chunkMap.end() ? 1 : 0);
+		if (it != chunkMap.end()) return it->second;
+	} else if (trace) {
+		MCPE_EXIT_TRACE("SkyLevelSource getChunk map bypassed");
+	}
 
     // PE's chunk seed constants, with explicit 32-bit wraparound.
     uint32_t seed = (uint32_t)x * 341872712u + (uint32_t)z * 132899541u;
     random.setSeed((long)(int32_t)seed);
-    unsigned char* blocks = new unsigned char[LevelChunk::ChunkBlockCount];
-    LevelChunk* chunk = new LevelChunk(level, blocks, x, z);
-    chunkMap.insert(std::make_pair(key, chunk));
-    Biome** biomes = level->getBiomeSource()->getBiomeBlock(x * 16, z * 16, 16, 16);
-    prepareHeights(x, z, blocks);
-    buildSurfaces(x, z, blocks, biomes);
-    chunk->recalcHeightmap();
-    return chunk;
+	unsigned char* blocks = new unsigned char[LevelChunk::ChunkBlockCount];
+	if (trace)
+		MCPE_EXIT_TRACE("SkyLevelSource getChunk blocks allocated=%p", (void*)blocks);
+	LevelChunk* chunk = new LevelChunk(level, blocks, x, z);
+	if (trace)
+		MCPE_EXIT_TRACE("SkyLevelSource getChunk chunk allocated=%p", (void*)chunk);
+	if (!bypassChunkMap) {
+		chunkMap.insert(std::make_pair(key, chunk));
+		if (trace)
+			MCPE_EXIT_TRACE("SkyLevelSource getChunk map insert complete");
+	}
+	Biome** biomes = level->getBiomeSource()->getBiomeBlock(x * 16, z * 16, 16, 16);
+	if (trace)
+		MCPE_EXIT_TRACE("SkyLevelSource getChunk biomes=%p", (void*)biomes);
+	prepareHeights(x, z, blocks);
+	if (trace)
+		MCPE_EXIT_TRACE("SkyLevelSource getChunk heights complete");
+	buildSurfaces(x, z, blocks, biomes);
+	if (trace)
+		MCPE_EXIT_TRACE("SkyLevelSource getChunk surfaces complete");
+	chunk->recalcHeightmap();
+	if (trace)
+		MCPE_EXIT_TRACE("SkyLevelSource getChunk complete chunk=%p", (void*)chunk);
+	return chunk;
+#endif
 }
 
 LevelChunk* SkyLevelSource::create(int x, int z) { return getChunk(x, z); }

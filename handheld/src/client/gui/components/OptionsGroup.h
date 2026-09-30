@@ -20,6 +20,7 @@ public:
 	virtual OptionsGroup& addOptionItem(const Options::Option* option, Minecraft* minecraft);
 	TextBox* addTextInput(const std::string& label, const std::string& hint, const std::string& value);
 	OptionsGroup& addDisabledItem(const std::string& label, const std::string& value);
+	OptionsGroup& addDescription(const std::string& text);
 	OptionsGroup& addClearSkinCacheItem(Minecraft* minecraft);
 	OptionsGroup& addImportSkinItem(Minecraft* minecraft);
 protected:

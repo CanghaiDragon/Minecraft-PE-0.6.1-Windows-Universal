@@ -38,6 +38,11 @@ Chunk::Chunk( Level* level_, int x, int y, int z, int size, int lists_, GLuint* 
 #endif
 	for (int l = 0; l < NumLayers; l++) {
 		empty[l] = false;
+	#ifdef MCPE_CLIENT_MESH
+		_cpuMesh[l].clear();
+		_cpuVertexCount[l] = 0;
+		renderChunk[l].clientData = NULL;
+	#endif
 	}
 
 	radius = Mth::sqrt((float)(xs * xs + ys * ys + zs * zs)) * 0.5f;
@@ -118,13 +123,12 @@ void Chunk::rebuildImpl(Tesselator& tArg, bool cpuOnly)
 
 #ifndef USE_VBO
 							if (!cpuOnly) {
+							#if !defined(MCPE_CLIENT_MESH)
 								glNewList(lists + l, GL_COMPILE);
-								glPushMatrix2();
-								translateToPos();
-								float ss = 1.000001f;
-								glTranslatef2(-zs / 2.0f, -ys / 2.0f, -zs / 2.0f);
-								glScalef2(ss, ss, ss);
-								glTranslatef2(zs / 2.0f, ys / 2.0f, zs / 2.0f);
+								// TileRenderer receives world coordinates, unlike the old
+								// local-coordinate VBO mesh. Do not add the chunk origin
+								// again here; RenderList already applies the camera offset.
+							#endif
 							}
 #endif
 							tArg.begin();
@@ -156,9 +160,17 @@ void Chunk::rebuildImpl(Tesselator& tArg, bool cpuOnly)
 				renderChunk[l].pos.y = (float)this->y;
 				renderChunk[l].pos.z = (float)this->z;
 #else
+			#if defined(MCPE_CLIENT_MESH)
+				tArg.endToCPU(_cpuMesh[l], _cpuVertexCount[l]);
+				renderChunk[l].clientData = _cpuMesh[l].empty() ? NULL : _cpuMesh[l].data();
+				renderChunk[l].vertexCount = _cpuVertexCount[l];
+				renderChunk[l].pos.x = (float)this->x;
+				renderChunk[l].pos.y = (float)this->y;
+				renderChunk[l].pos.z = (float)this->z;
+			#elif !defined(USE_VBO)
 				tArg.end(false, -1);
-				glPopMatrix2();
 				glEndList();
+			#endif
 #endif
 			}
 #else  // !desktop
@@ -168,18 +180,31 @@ void Chunk::rebuildImpl(Tesselator& tArg, bool cpuOnly)
 			renderChunk[l].pos.y = (float)this->y;
 			renderChunk[l].pos.z = (float)this->z;
 #else
+		#if defined(MCPE_CLIENT_MESH)
+			tArg.endToCPU(_cpuMesh[l], _cpuVertexCount[l]);
+			renderChunk[l].clientData = _cpuMesh[l].empty() ? NULL : _cpuMesh[l].data();
+			renderChunk[l].vertexCount = _cpuVertexCount[l];
+			renderChunk[l].pos.x = (float)this->x;
+			renderChunk[l].pos.y = (float)this->y;
+			renderChunk[l].pos.z = (float)this->z;
+		#elif !defined(USE_VBO)
 			tArg.end(false, -1);
-			glPopMatrix2();
 			glEndList();
+		#endif
 #endif
 #endif  // desktop
 			tArg.offset(0, 0, 0);
 		} else {
 			rendered = false;
 #if defined(MACOS) || defined(LINUX) || defined(WIN32)
+			#if defined(MCPE_CLIENT_MESH)
+			if (true) {
+			#else
 			if (cpuOnly) {
+			#endif
 				_cpuMesh[l].clear();
 				_cpuVertexCount[l] = 0;
+				renderChunk[l].clientData = NULL;
 			}
 #endif
 		}
@@ -260,6 +285,13 @@ void Chunk::reset()
 	visible = false;
 	compiled = false;
     _empty = true;
+#ifdef MCPE_CLIENT_MESH
+	for (int i = 0; i < NumLayers; ++i) {
+		_cpuMesh[i].clear();
+		_cpuVertexCount[i] = 0;
+		renderChunk[i].clientData = NULL;
+	}
+#endif
 }
 
 int Chunk::getList( int layer )
