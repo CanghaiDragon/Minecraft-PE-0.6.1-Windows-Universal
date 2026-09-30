@@ -792,13 +792,6 @@ void Minecraft::tickInput() {
 				}
 			#endif
 			#if defined(MACOS) || defined(LINUX)
-				if (key == Keyboard::KEY_F) {
-					options.isFlying = !options.isFlying;
-					player->noPhysics = options.isFlying;
-				}
-				if (key == Keyboard::KEY_T) {
-					options.thirdPersonView = !options.thirdPersonView;
-				}
 				if (options.debugScreenEnabled && key == Keyboard::KEY_F3) {
 					options.renderDebug = !options.renderDebug;
 				}
@@ -814,18 +807,25 @@ void Minecraft::tickInput() {
 					options.thirdPersonView = !options.thirdPersonView;
 				}
 
-				if (key == Keyboard::KEY_F) {
+				// Keep the old no-physics flight shortcut available only in
+				// creative mode.  setIsCreativeMode() clears it when switching
+				// back to survival.
+				if (key == Keyboard::KEY_F && isCreativeMode()) {
 					options.isFlying = !options.isFlying;
 					player->noPhysics = options.isFlying;
 				}
 
-				if (key == Keyboard::KEY_T) {
-					options.thirdPersonView = !options.thirdPersonView;
-					/*
-					ImprovedNoise noise;
-					for (int i = 0; i < 16; ++i)
-						printf("%d\t%f\n", i, noise.grad2(i, 3, 8));
-					*/
+				// Q is the drop-item shortcut; keyboard crafting is bound to R.
+				if (!screen && key == options.keyDrop.key) {
+					ItemInstance* selected = player->inventory->getSelected();
+					if (selected && selected->count > 0) {
+						ItemInstance* dropped = selected->copy();
+						dropped->count = 1;
+						player->drop(dropped, false);
+						--selected->count;
+						if (selected->count <= 0)
+							player->inventory->clearSlot(player->inventory->selected);
+					}
 				}
 
 				if (key == Keyboard::KEY_O) {
@@ -860,29 +860,6 @@ void Minecraft::tickInput() {
 					textures->reloadAll();
 					player->hurtTo(2);
 				}
-				if (key == Keyboard::KEY_Z || key == 108) {
-					for (int i = 0; i < 1; ++i) {
-						Mob* mob = NULL;
-						int forceId = 0;//MobTypes::Sheep;
-
-						int types[] = {
-							MobTypes::Sheep,
-							MobTypes::Pig,
-							MobTypes::Chicken,
-							MobTypes::Cow,
-						};
-
-						int mobType = (forceId > 0)? forceId : types[Mth::random(sizeof(types) / sizeof(int))];
-						mob = MobFactory::CreateMob(mobType, level);
-
-						//((Animal*)mob)->setAge(-1000);
-						float dx = 4 - 8 * Mth::random() + 4 * Mth::sin(Mth::DEGRAD * player->yRot);
-						float dz = 4 - 8 * Mth::random() + 4 * Mth::cos(Mth::DEGRAD * player->yRot);
-						if (mob && !MobSpawner::addMob(level, mob, player->x + dx, player->y, player->z + dz, Mth::random()*360, 0, true))
-							delete mob;
-					}
-				}
-
 				if (key == Keyboard::KEY_X) {
 					const EntityList& entities = level->getAllEntities();
 					for (int i = entities.size()-1; i >= 0; --i) {
@@ -1695,6 +1672,12 @@ void Minecraft::audioEngineOff() {
 
 void Minecraft::setIsCreativeMode(bool isCreative)
 {
+	if (!isCreative && options.isFlying) {
+		options.isFlying = false;
+		if (player)
+			player->noPhysics = false;
+	}
+
 #ifdef CREATORMODE
 	delete gameMode;
 	gameMode = new CreatorMode(this);

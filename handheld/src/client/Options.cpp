@@ -74,7 +74,7 @@ void Options::initDefaultValues() {
 	keyBuild = KeyMapping("key.inventory", Keyboard::KEY_E);
 	keySneak = KeyMapping("key.sneak", Keyboard::KEY_LSHIFT);
 #ifndef RPI
-	keyCraft = KeyMapping("key.crafting", Keyboard::KEY_Q);
+	keyCraft = KeyMapping("key.crafting", Keyboard::KEY_R);
 	keyDrop  = KeyMapping("key.drop", Keyboard::KEY_Q);
 	keyChat  = KeyMapping("key.chat", Keyboard::KEY_T);
 	keyFog   = KeyMapping("key.fog", Keyboard::KEY_F);

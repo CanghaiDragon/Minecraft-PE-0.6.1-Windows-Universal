@@ -258,7 +258,6 @@ void OptionsScreen::generateOptionScreens() {
 	optionPanes[4]->createOptionsGroup("options.category.additional")
 		.addOptionItem(&Options::Option::INFINITE_WORLDS, minecraft)
 		.addOptionItem(&Options::Option::SKIN_MENU, minecraft)
-		.addDescription("Re-enter Options to open Skin Settings")
 		.addOptionItem(&Options::Option::TOUCH_SNEAK, minecraft)
 		.addOptionItem(&Options::Option::BETA_VISUALS, minecraft)
 		.addOptionItem(&Options::Option::DEBUG_SCREEN, minecraft)

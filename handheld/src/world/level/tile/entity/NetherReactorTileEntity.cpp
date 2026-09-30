@@ -10,6 +10,13 @@
 #include "../../../Difficulty.h"
 #include "../../../phys/AABB.h"
 #include "../NetherReactorPattern.h"
+
+namespace {
+bool isValidReactorSpawnPosition(Level* level, const Vec3& position) {
+	return level->inRange(Mth::floor(position.x), Mth::floor(position.y), Mth::floor(position.z));
+}
+}
+
 NetherReactorTileEntity::NetherReactorTileEntity()
 	: super(TileEntityType::NetherReactor)
 	, isInitialized(false)
@@ -130,8 +137,12 @@ Vec3 NetherReactorTileEntity::getSpawnPosition( float minDistance, float varible
 void NetherReactorTileEntity::spawnEnemy() {
 	Mob* mob = MobFactory::CreateMob(MobTypes::PigZombie, level);
 	Vec3 enemyPosition = getSpawnPosition(3, 4, -1);
-	while(enemyPosition.x < 0 || enemyPosition.z < 0 || enemyPosition.x >= LEVEL_WIDTH || enemyPosition.z >= LEVEL_DEPTH) {
+	for (int attempts = 0; !isValidReactorSpawnPosition(level, enemyPosition) && attempts < 32; ++attempts) {
 		enemyPosition = getSpawnPosition(3, 4, -1);
+	}
+	if (!isValidReactorSpawnPosition(level, enemyPosition)) {
+		delete mob;
+		return;
 	}
 	MobSpawner::addMob(level, mob, enemyPosition.x, enemyPosition.y, enemyPosition.z, 0, 0, true);
 }
@@ -140,9 +151,11 @@ void NetherReactorTileEntity::spawnEnemy() {
 
 void NetherReactorTileEntity::spawnItem() {
 	Vec3 itemPosition= getSpawnPosition(3, 4, -1);
-	while(itemPosition.x < 0 || itemPosition.z < 0 || itemPosition.x >= LEVEL_WIDTH || itemPosition.z >= LEVEL_DEPTH) {
+	for (int attempts = 0; !isValidReactorSpawnPosition(level, itemPosition) && attempts < 32; ++attempts) {
 		itemPosition = getSpawnPosition(3, 4, -1);
 	}
+	if (!isValidReactorSpawnPosition(level, itemPosition))
+		return;
 	ItemEntity* item = new ItemEntity(level, itemPosition.x, itemPosition.y, itemPosition.z, getSpawnItem());
 
 	item->throwTime = 10;
@@ -177,14 +190,16 @@ ItemInstance NetherReactorTileEntity::GetLowOddsSpawnItem() {
 			Item::painting,
 			Item::door_wood
 		};
-		int itemIndex = level->random.nextInt(sizeof(items) / 4);
+		// Do not assume 32-bit pointers here.  This code also runs on x64,
+		// where sizeof(items) is twice the number of elements in bytes.
+		int itemIndex = level->random.nextInt(sizeof(items) / sizeof(items[0]));
 		Item* itemToSpawn = items[itemIndex];
 		return ItemInstance(itemToSpawn);
 	} else {
 		static Tile* tiles[] = {
 			Tile::bookshelf
 		};
-		int tileIndex = level->random.nextInt(sizeof(tiles) / 4);
+		int tileIndex = level->random.nextInt(sizeof(tiles) / sizeof(tiles[0]));
 		Tile* tileToSpawn = tiles[tileIndex];
 		return ItemInstance(tileToSpawn);
 	}
@@ -192,7 +207,7 @@ ItemInstance NetherReactorTileEntity::GetLowOddsSpawnItem() {
 
 bool NetherReactorTileEntity::checkLevelChange( int progress ) {
 	static const int levelChangeTime[] = {10, 13, 20, 22, 25, 30, 34, 36, 38, 40};
-	const int count = sizeof(levelChangeTime) / 4;
+	const int count = sizeof(levelChangeTime) / sizeof(levelChangeTime[0]);
 	for(int a = 0; a < count; ++a) {
 		if(levelChangeTime[a] == progress)
 			return true;
