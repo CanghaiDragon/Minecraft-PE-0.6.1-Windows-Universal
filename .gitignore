@@ -39,6 +39,8 @@ handheld/project/x86/MinecraftWin32/
 handheld/project/x64/Debug/
 handheld/project/x64/Release/
 handheld/project/x64/MinecraftWin64/
+handheld/project/x64/games/
+handheld/project/x64/options.txt
 handheld/project/x64/x64/
 handheld/project/arm64/Debug/
 handheld/project/arm64/Release/
