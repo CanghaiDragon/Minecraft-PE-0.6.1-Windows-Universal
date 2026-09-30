@@ -155,6 +155,7 @@ public:
 	virtual bool supportsTouchscreen();
 	virtual bool hasBuyButtonWhenInvalidLicense();
 	virtual void showKeyboard();
+	virtual void openUrl(const std::string& url);
 
 private:
 };

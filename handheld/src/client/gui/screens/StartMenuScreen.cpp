@@ -21,6 +21,23 @@
 #include "SimpleChooseLevelScreen.h"
 #include "../../renderer/Textures.h"
 #include "../../../SharedConstants.h"
+#include "../../../platform/input/Mouse.h"
+
+namespace {
+const char* getBuildArchitecture() {
+#if defined(_M_ARM64)
+	return "ARM64";
+#elif defined(_M_ARM)
+	return "ARM32";
+#elif defined(_M_X64)
+	return "x64";
+#elif defined(_M_IX86)
+	return "x86";
+#else
+	return "unknown";
+#endif
+}
+}
 
 // Some kind of default settings, might be overridden in ::init
 StartMenuScreen::StartMenuScreen()
@@ -59,6 +76,9 @@ void StartMenuScreen::init()
 	#endif
 
 	copyright = "\xffMojang AB";//. Do not distribute!";
+	githubUrl = "https://github.com/CanghaiDragon/Minecraft-PE-0.6.1-Windows-Universal/tree/master";
+	githubLabel = "Visit Github Repository";
+	buildInfo = std::string("Windows Universal v1.0 build ") + getBuildArchitecture();
 
 	#ifdef PRE_ANDROID23
 		std::string versionString = Common::getGameVersionString("j");
@@ -98,7 +118,7 @@ void StartMenuScreen::setupPositions() {
 	bJoin.y =	 yBase + 2;
 #endif
 
-	bOptions.y = height - bOptions.height - 8;
+	bOptions.y = height - bOptions.height - 32;
 	bTest.y = bBuy.y = bOptions.y;
 	bQuit.y = bOptions.y;
 	//#endif
@@ -153,6 +173,16 @@ void StartMenuScreen::buttonClicked(Button* button) {
 	}
 }
 
+void StartMenuScreen::mouseClicked(int x, int y, int buttonNum) {
+	if (buttonNum == MouseAction::ACTION_LEFT
+		&& x >= 2 && x < 2 + font->width(githubLabel)
+		&& y >= height - 22 && y < height - 8) {
+		minecraft->platform()->openUrl(githubUrl);
+		return;
+	}
+	Screen::mouseClicked(x, y, buttonNum);
+}
+
 bool StartMenuScreen::isInGameScreen() { return false; }
 
 void StartMenuScreen::render( int xm, int ym, float a )
@@ -193,6 +223,8 @@ void StartMenuScreen::render( int xm, int ym, float a )
 #endif
 
 	drawString(font, version, versionPosX, 62, /*50,*/ 0xffcccccc);//0x666666);
+	drawString(font, githubLabel, 2, height - 20, 0xffcccccc);
+	drawString(font, buildInfo, 2, height - 10, 0xffcccccc);
 	drawString(font, copyright, copyrightPosX, height - 10, 0xffffff);
 
 	Screen::render(xm, ym, a);

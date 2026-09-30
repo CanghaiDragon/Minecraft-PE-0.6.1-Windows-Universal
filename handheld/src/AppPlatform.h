@@ -116,6 +116,7 @@ public:
 	virtual bool isSuperFast() { return false; }
 
 	virtual void buyGame() {}
+	virtual void openUrl(const std::string& url) { (void) url; }
 
 	virtual void finish() {}
 	

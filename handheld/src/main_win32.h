@@ -29,6 +29,7 @@
 #include "platform/input/TouchTrace.h"
 #include "util/Mth.h"
 #include "AppPlatform_win32.h"
+#include "../data/images/resource.h"
 
 static App* g_app = 0;
 static volatile bool g_running = true;
@@ -505,7 +506,7 @@ case WM_TOUCH: {
 }
 
 void platform(HWND *result, int width, int height) {
-	WNDCLASS wc;
+	WNDCLASSEX wc = {};
 	RECT wRect;
 	HWND hwnd;
 	HINSTANCE hInstance;
@@ -517,22 +518,28 @@ void platform(HWND *result, int width, int height) {
 
 	hInstance = GetModuleHandle(NULL);
 
+	wc.cbSize = sizeof(wc);
 	wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 	wc.lpfnWndProc = (WNDPROC)windowProc;
 	wc.cbClsExtra = 0;
 	wc.cbWndExtra = 0;
 	wc.hInstance = hInstance;
-	wc.hIcon = LoadIcon(NULL, IDI_WINLOGO);
+	wc.hIcon = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON, 32, 32, LR_DEFAULTCOLOR);
+	wc.hIconSm = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
+	if (!wc.hIcon) wc.hIcon = LoadIcon(NULL, IDI_WINLOGO);
+	if (!wc.hIconSm) wc.hIconSm = wc.hIcon;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = NULL;
 	wc.lpszMenuName = NULL;
 	wc.lpszClassName = "OGLES";
 
-	RegisterClass(&wc);
+	RegisterClassEx(&wc);
 
 	AdjustWindowRectEx(&wRect, WS_OVERLAPPEDWINDOW, FALSE, WS_EX_APPWINDOW | WS_EX_WINDOWEDGE);
 
-	hwnd = CreateWindowEx(WS_EX_APPWINDOW | WS_EX_WINDOWEDGE, "OGLES", "main", WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN, 0, 0, wRect.right-wRect.left, wRect.bottom-wRect.top, NULL, NULL, hInstance, NULL);
+	hwnd = CreateWindowEx(WS_EX_APPWINDOW | WS_EX_WINDOWEDGE, "OGLES", "Minecraft PE", WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN, 0, 0, wRect.right-wRect.left, wRect.bottom-wRect.top, NULL, NULL, hInstance, NULL);
+	SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)wc.hIcon);
+	SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)wc.hIconSm);
 	RegisterTouchWindow(hwnd, 0);
 	*result = hwnd;
 }

@@ -27,6 +27,7 @@ public:
 	void render(int xm, int ym, float a);
 
 	void buttonClicked(Button* button);
+	void mouseClicked(int x, int y, int buttonNum);
 	bool handleBackEvent(bool isDown);
 	bool isInGameScreen();
 private:
@@ -44,6 +45,10 @@ private:
 
 	std::string version;
 	int versionPosX;
+
+	std::string githubUrl;
+	std::string githubLabel;
+	std::string buildInfo;
 };
 };
 

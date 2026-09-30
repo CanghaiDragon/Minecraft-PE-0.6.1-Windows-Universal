@@ -21,3 +21,7 @@ bool AppPlatform_win32::hasBuyButtonWhenInvalidLicense() { return true; }
 void AppPlatform_win32::showKeyboard() {
 	ShellExecuteA(NULL, "open", "C:\\Program Files\\Common Files\\microsoft shared\\ink\\TabTip.exe", NULL, NULL, SW_SHOWNORMAL);
 }
+
+void AppPlatform_win32::openUrl(const std::string& url) {
+	ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+}
