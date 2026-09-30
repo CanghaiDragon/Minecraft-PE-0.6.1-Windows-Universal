@@ -4,8 +4,6 @@
 //package net.minecraft.world.level;
 
 #include <set>
-#include <deque>
-#include <list>
 #include <string>
 
 //#include "world/Difficulty.h"
@@ -103,7 +101,6 @@ public:
     bool hasChunksAt(int x, int y, int z, int r);
     bool hasChunksAt(int x0, int y0, int z0, int x1, int y1, int z1);
     bool hasChunk(int x, int z);
-    bool hasLoadedChunk(int x, int z);
     LevelChunk* getChunkAt(int x, int z);
     LevelChunk* getChunk(int x, int z);
 
@@ -333,8 +330,6 @@ private:
 	//EntityList  _entitiesToRemove;
 	TickDataSet _tickNextTickSet;
 	ChunkPosSet _chunksToPoll;
-	std::list<ChunkPos> _farChunksToLoad;
-	ChunkPosSet _farChunksQueued;
 	LightUpdateList _lightUpdates;
 	EntityMap _pendingEntityData;
 	bool _updateLights;

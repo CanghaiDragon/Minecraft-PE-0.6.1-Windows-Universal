@@ -58,8 +58,7 @@ public:
 	bool updateDirtyChunks(Mob* player, bool force);
 	void setDirty(int x0, int y0, int z0, int x1, int y1, int z1);
     void tileChanged(int x, int y, int z);
-	void setTilesDirty(int x0, int y0, int z0, int x1, int y1, int z1);
-	void setTilesDirtyUrgent(int x0, int y0, int z0, int x1, int y1, int z1);
+    void setTilesDirty(int x0, int y0, int z0, int x1, int y1, int z1);
 	void cull(Culler* culler, float a);
     void skyColorChanged();
 
@@ -103,7 +102,6 @@ private:
 
 	Level* level;
 	std::vector<Chunk*> dirtyChunks;
-	std::vector<Chunk*> urgentDirtyChunks;
 
 	Chunk** chunks;
     Chunk** sortedChunks;

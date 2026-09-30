@@ -684,17 +684,6 @@ bool LevelRenderer::updateDirtyChunks( Mob* player, bool force )
 		chunkWatch.start();
 
 		int rebuilt = 0;
-		while (!urgentDirtyChunks.empty() && rebuilt < MaxChunksPerFrame) {
-			Chunk* urgent = urgentDirtyChunks.back();
-			urgentDirtyChunks.pop_back();
-			if (!urgent->isDirty()) continue;
-			chunkWatch.stopContinue();
-			urgent->rebuild();
-			urgent->setClean();
-			dirtyChunks.erase(std::remove(dirtyChunks.begin(), dirtyChunks.end(), urgent), dirtyChunks.end());
-			rebuilt++;
-			if (chunkWatch.stopContinue() >= MaxFrameTime) break;
-		}
 		while (!dirtyChunks.empty()) {
 			Chunk* chunk = dirtyChunks.back();
 			if (force && !chunk->visible) {
@@ -843,16 +832,6 @@ void LevelRenderer::tileChanged( int x, int y, int z)
 void LevelRenderer::setTilesDirty( int x0, int y0, int z0, int x1, int y1, int z1 )
 {
 	setDirty(x0 - 1, y0 - 1, z0 - 1, x1 + 1, y1 + 1, z1 + 1);
-}
-
-void LevelRenderer::setTilesDirtyUrgent( int x0, int y0, int z0, int x1, int y1, int z1 )
-{
-	setTilesDirty(x0, y0, z0, x1, y1, z1);
-	// setDirty() already expands across all affected vertical render sections.
-	// Promote the dirty sections it marked without rescanning block contents.
-	for (std::vector<Chunk*>::iterator it = dirtyChunks.begin(); it != dirtyChunks.end(); ++it)
-		if (*it && std::find(urgentDirtyChunks.begin(), urgentDirtyChunks.end(), *it) == urgentDirtyChunks.end())
-			urgentDirtyChunks.push_back(*it);
 }
 
 
@@ -1015,10 +994,7 @@ void LevelRenderer::renderBetaSky(float alpha) {
 	// intentionally disabled it, so enable it again before the sun/moon batch.
 	glEnable2(GL_TEXTURE_2D);
 	glPushMatrix2();
-	// X is east/west in the world coordinate system (+X east, -X west).
-	// Rotating the celestial plane around X makes the sun travel north/south;
-	// rotate around Z so sunrise and sunset follow the east/west axis shown by F3.
-	glRotatef2(level->getSunAngle(alpha) * Mth::RADDEG, 0, 0, 1);
+	glRotatef2(level->getSunAngle(alpha) * Mth::RADDEG, 1, 0, 0);
 	Tesselator& t = Tesselator::instance;
 	textures->loadAndBindTexture("terrain/sun.png");
 	t.begin();

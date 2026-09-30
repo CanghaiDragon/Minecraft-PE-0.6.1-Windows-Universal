@@ -1,5 +1,4 @@
 #include "Level.h"
-#include <climits>
 #include "LevelListener.h"
 #include "tile/entity/TileEntity.h"
 #include "../entity/player/Player.h"
@@ -286,28 +285,10 @@ void Level::tickTiles() {
 				zp >= 0 && zp < CHUNK_CACHE_WIDTH))
 				_chunksToPoll.insert(ChunkPos(xp, zp));
 		}
-		// Queue the outer ring separately: far chunks are loaded for rendering,
-		// but must not consume the normal random-tick pass.
-		// Experimental Java-like loading window: Beta 1.7.3 keeps roughly
-		// fifteen chunks around the player eligible for loading.
-		for (int dx = -15; dx <= 15; ++dx) {
-			for (int dz = -15; dz <= 15; ++dz) {
-				const int xp = xx + dx;
-				const int zp = zz + dz;
-				if (levelData.isInfinite() || (xp >= 0 && xp < CHUNK_CACHE_WIDTH && zp >= 0 && zp < CHUNK_CACHE_WIDTH))
-				if (dx < -4 || dx > 4 || dz < -4 || dz > 4) {
-					ChunkPos farPos(xp, zp);
-					if (!hasLoadedChunk(xp, zp) && _farChunksQueued.insert(farPos).second)
-						_farChunksToLoad.push_back(farPos);
-				}
-				else
-					_chunksToPoll.insert(ChunkPos(xp, zp));
-			}
-		}
     }
 	TIMER_POP();
 
-	//if (delayUntilNextMoodSound > 0) delayUntilNextMoodSound--;
+    //if (delayUntilNextMoodSound > 0) delayUntilNextMoodSound--;
 	TIMER_PUSH("loop");
     for (ChunkPosSet::iterator it = _chunksToPoll.begin(); it != _chunksToPoll.end(); ++it) {
 		const ChunkPos& cp = *it;
@@ -354,25 +335,6 @@ void Level::tickTiles() {
 		TIMER_POP();
     }
 	TIMER_POP();
-
-	// Load at most two outer-ring chunks per tick. They are intentionally not
-	// random-ticked; this keeps distant terrain from competing with gameplay.
-	for (int budget = 0; !players.empty() && budget < 2 && !_farChunksToLoad.empty(); ++budget) {
-		int playerX = Mth::floor(players[0]->x / 16);
-		int playerZ = Mth::floor(players[0]->z / 16);
-		std::list<ChunkPos>::iterator best = _farChunksToLoad.begin();
-		long bestDistance = LONG_MAX;
-		for (std::list<ChunkPos>::iterator it = _farChunksToLoad.begin(); it != _farChunksToLoad.end(); ++it) {
-			long dx = (long)it->x - playerX;
-			long dz = (long)it->z - playerZ;
-			long distance = dx * dx + dz * dz;
-			if (distance < bestDistance) { bestDistance = distance; best = it; }
-		}
-		ChunkPos cp = *best;
-		_farChunksToLoad.erase(best);
-		_farChunksQueued.erase(cp);
-		if (!hasLoadedChunk(cp.x, cp.z)) this->getChunk(cp.x, cp.z);
-	}
 	//w.stop();
 	//w.printEvery(30, "ticktiles");
 }
@@ -666,10 +628,6 @@ bool Level::hasChunk(int x, int z) {
     return _chunkSource->hasChunk(x, z);
 }
 
-bool Level::hasLoadedChunk(int x, int z) {
-    return _chunkSource->hasLoadedChunk(x, z);
-}
-
 LevelChunk* Level::getChunkAt(int x, int z) {
     return getChunk(x >> 4, z >> 4);
 }
@@ -798,10 +756,7 @@ void Level::setTileDirty(int x, int y, int z) {
 
 void Level::setTilesDirty(int x0, int y0, int z0, int x1, int y1, int z1) {
     for (unsigned int i = 0; i < _listeners.size(); i++) {
-		if (isGeneratingTerrain)
-			_listeners[i]->setTilesDirtyUrgent(x0, y0, z0, x1, y1, z1);
-		else
-			_listeners[i]->setTilesDirty(x0, y0, z0, x1, y1, z1);
+        _listeners[i]->setTilesDirty(x0, y0, z0, x1, y1, z1);
     }
 }
 

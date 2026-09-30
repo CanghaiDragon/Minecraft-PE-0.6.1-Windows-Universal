@@ -21,9 +21,6 @@ public:
 	virtual ~ChunkSource(){}
 
 	virtual bool hasChunk(int x, int y) = 0;
-	// True only when the chunk is already resident in this source/cache.
-	// This must not imply that the chunk is merely generatable.
-	virtual bool hasLoadedChunk(int x, int z) { return false; }
 
     virtual LevelChunk* getChunk(int x, int z) = 0;
 

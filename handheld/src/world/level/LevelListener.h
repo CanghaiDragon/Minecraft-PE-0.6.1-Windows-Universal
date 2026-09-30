@@ -17,7 +17,6 @@ public:
     virtual ~LevelListener() {}
 
 	virtual void setTilesDirty(int x0, int y0, int z0, int x1, int y1, int z1) {}
-	virtual void setTilesDirtyUrgent(int x0, int y0, int z0, int x1, int y1, int z1) { setTilesDirty(x0, y0, z0, x1, y1, z1); }
 	virtual void tileChanged(int x, int y, int z) {}
 
 	virtual void tileBrightnessChanged(int x, int y, int z) { tileChanged(x, y, z); }

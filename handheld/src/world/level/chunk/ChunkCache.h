@@ -8,10 +8,7 @@
 #include "EmptyLevelChunk.h"
 #include "../Level.h"
 #include "../LevelConstants.h"
-#include "../../../util/PerfTimer.h"
 #include <unordered_map>
-#include <set>
-#include <deque>
 #include <cstdint>
 
 class ChunkCache: public ChunkSource {
@@ -58,14 +55,6 @@ public:
         return it != chunks.end() && (it->second == emptyChunk || it->second->isAt(x, z));
     }
 
-    bool hasLoadedChunk(int x, int z) override {
-        if (x == xLast && z == zLast && last != NULL) return true;
-        int64_t key = chunkKey(x, z);
-        auto it = chunks.find(key);
-        return it != chunks.end() && it->second != NULL && it->second != emptyChunk
-            && it->second->isAt(x, z);
-    }
-
     LevelChunk* create(int x, int z) {
         return getChunk(x, z);
     }
@@ -77,26 +66,28 @@ public:
         int64_t key = chunkKey(x, z);
         if (!hasChunk(x, z)) {
             // No eviction needed — hash map holds each (x,z) independently
-			TIMER_PUSH("chunkLoadStorage");
-			LevelChunk* newChunk = load(x, z);
-			TIMER_POP();
+            LevelChunk* newChunk = load(x, z);
+			bool updateLights = false;
             if (newChunk == NULL) {
                 if (source == NULL) newChunk = emptyChunk;
-				else {
-					TIMER_PUSH("chunkTerrainGeneration");
-					newChunk = source->getChunk(x, z);
-					TIMER_POP();
-				}
+                else newChunk = source->getChunk(x, z);
             } else {
+				updateLights = true;
             }
             chunks[key] = newChunk;
-			TIMER_PUSH("chunkLighting");
-			newChunk->lightLava();
+            newChunk->lightLava();
 
-			// Loaded chunks already carry their saved light arrays. Recomputing
-			// every column here duplicates the saved data and can enqueue millions
-			// of light updates while exploring. Local block changes still use the
-			// normal Level::updateLight path.
+			if (updateLights) {
+				for (int cx = 0; cx < 16; cx++) {
+					for (int cz = 0; cz < 16; cz++) {
+						int height = level->getHeightmap(cx + x * 16, cz + z * 16);
+						for (int cy = height; cy >= 0; cy--) {
+							level->updateLight(LightLayer::Sky, cx + x * 16, cy, cz + z * 16, cx + x * 16, cy, cz + z * 16);
+							level->updateLight(LightLayer::Block, cx + x * 16 - 1, cy, cz + z * 16 - 1, cx + x * 16 + 1, cy, cz + z * 16 + 1);
+						}
+					}
+				}
+			}
 
             LevelChunk* stored = chunks[key];
             if (stored != NULL) stored->load();
@@ -105,8 +96,10 @@ public:
             // so it rebuilds the faces at the boundary with already-rendered neighbours.
             level->setTilesDirty(x * 16, 0, z * 16, x * 16 + 15, 127, z * 16 + 15);
 
-			TIMER_POP();
-			queuePostProcess(x, z);
+            if (!chunks[key]->terrainPopulated && hasChunk(x + 1, z + 1) && hasChunk(x, z + 1) && hasChunk(x + 1, z)) postProcess(this, x, z);
+            if (hasChunk(x - 1, z) && !getChunk(x - 1, z)->terrainPopulated && hasChunk(x - 1, z + 1) && hasChunk(x, z + 1) && hasChunk(x - 1, z)) postProcess(this, x - 1, z);
+            if (hasChunk(x, z - 1) && !getChunk(x, z - 1)->terrainPopulated && hasChunk(x + 1, z - 1) && hasChunk(x, z - 1) && hasChunk(x + 1, z)) postProcess(this, x, z - 1);
+            if (hasChunk(x - 1, z - 1) && !getChunk(x - 1, z - 1)->terrainPopulated && hasChunk(x - 1, z - 1) && hasChunk(x, z - 1) && hasChunk(x - 1, z)) postProcess(this, x - 1, z - 1);
         }
         xLast = x;
         zLast = z;
@@ -118,27 +111,17 @@ public:
 		return source->getMobsAt(mobCategory, x, y, z);
 	}
 
-	void postProcess(ChunkSource* parent, int x, int z) {
+    void postProcess(ChunkSource* parent, int x, int z) {
 		if (!fits(x, z)) return;
         LevelChunk* chunk = getChunk(x, z);
         if (!chunk->terrainPopulated) {
+            chunk->terrainPopulated = true;
             if (source != NULL) {
                 source->postProcess(parent, x, z);
 				chunk->clearUpdateMap();
             }
-			// Mark only after the complete feature pass returns. Features such
-			// as snow and trees can write into neighbouring chunks.
-			chunk->terrainPopulated = true;
         }
-	}
-
-	void queuePostProcess(int x, int z) {
-		if (!fits(x, z) || !hasLoadedChunk(x, z)) return;
-		LevelChunk* chunk = chunks[chunkKey(x, z)];
-		int64_t key = chunkKey(x, z);
-		if (chunk != NULL && !chunk->terrainPopulated && postProcessQueued.insert(key).second)
-			postProcessQueue.push_back(std::make_pair(x, z));
-	}
+    }
 
     //bool save(bool force, ProgressListener progressListener) {
     //    int saves = 0;
@@ -175,29 +158,7 @@ public:
     //}
 
     bool tick() {
-		// Population is deliberately incremental. Entries are retained until
-		// their neighbouring chunks are resident, so throttling cannot create
-		// permanently unpopulated/empty terrain.
-		int budget = 1;
-		while (budget-- > 0 && !postProcessQueue.empty()) {
-			std::pair<int, int> pos = postProcessQueue.front();
-			postProcessQueue.pop_front();
-			postProcessQueued.erase(chunkKey(pos.first, pos.second));
-			if (!hasLoadedChunk(pos.first, pos.second)) continue;
-			LevelChunk* chunk = chunks[chunkKey(pos.first, pos.second)];
-			if (chunk == NULL || chunk->terrainPopulated) continue;
-			if (hasLoadedChunk(pos.first + 1, pos.second + 1) &&
-				hasLoadedChunk(pos.first, pos.second + 1) &&
-				hasLoadedChunk(pos.first + 1, pos.second)) {
-				TIMER_PUSH("chunkPostProcess");
-				postProcess(this, pos.first, pos.second);
-				TIMER_POP();
-			} else {
-				if (postProcessQueued.insert(chunkKey(pos.first, pos.second)).second)
-					postProcessQueue.push_back(pos);
-			}
-		}
-		if (storage != NULL) storage->tick();
+        if (storage != NULL) storage->tick();
         return source->tick();
     }
 
@@ -255,9 +216,7 @@ public:
     int zLast;
 private:
     LevelChunk* emptyChunk;
-	ChunkSource* source;
-	std::deque<std::pair<int, int>> postProcessQueue;
-	std::set<int64_t> postProcessQueued;
+    ChunkSource* source;
     ChunkStorage* storage;
     std::unordered_map<int64_t, LevelChunk*> chunks;
     Level* level;
