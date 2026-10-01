@@ -1,14 +1,16 @@
-Minecraft PE 0.6.1 Windows Universal
-====================================
+<h1 align="center">Minecraft PE 0.6.1 Windows Universal</h1>
 
-[English](README.md)
+<div align="center"><a href="README.md">English</a></div>
 
 本项目是基于泄露的 Minecraft Pocket Edition 0.6.1 源代码开发的、以 Windows 为主要目标平台的延续项目。项目对游戏进行了现代化维护，使其支持 Windows x86、x64 和 ARM64，同时加入了输入、渲染、世界生成和用户界面等方面的改进。
 
 本项目仅用于教育和软件保存目的。欢迎 Fork 本项目，但请勿将其用于商业用途。
-项目状态
 
-## 维护状态
+---
+
+<h2 align="center">维护状态</h2>
+
+<div align="center">
 
 | 目标平台          | 状态                   | 构建系统          |
 | ------------- | -------------------- | ------------- |
@@ -17,10 +19,13 @@ Minecraft PE 0.6.1 Windows Universal
 | Windows ARM64 | 支持                   | Visual Studio |
 | Windows ARM32 | 实验性支持；可在部分 WOA 设备上运行 | Visual Studio |
 
-本项目主要面向 Windows 进行开发和测试。上游项目支持的其他平台并非本仓库的正式目标平台。
-上游项目与参考资料
+</div>
 
-## 引用与参考
+本项目主要面向 Windows 进行开发和测试。上游项目支持的其他平台并非本仓库的正式目标平台。
+
+---
+
+<h2 align="center">引用与参考</h2>
 
 2026 年 3 月，Minecraft Pocket Edition v0.6.1 的源代码在互联网上泄露，其可以在 [Minecraft PE Source Code](https://archive.org/details/Minecraftpesorucecode) 找到。这也是 GitHub 等网站上出现多个 MCPE 0.6.1 修改版本的原因。本项目同样是基于原始代码开发的修改版本。所有这些修改版本均**未获得 Mojang 的直接授权**。
 
@@ -32,7 +37,9 @@ Minecraft PE 0.6.1 Windows Universal
 
 本项目的主要开发工作在 Codex 的协助下完成。
 
-## 功能
+---
+
+<h2 align="center">功能</h2>
 
 ### 原版 MCPE 功能
 
@@ -41,12 +48,10 @@ Minecraft PE 0.6.1 Windows Universal
 * 生物、光照、天空渲染以及下界反应堆
 
 * 触摸屏操作
-  
-  
 
 ![下界反应堆](docs/nether_reactor.png)
 
-运行结束后的下界反应堆塔
+<div align="center">运行结束后的下界反应堆塔</div>
 
 ### 新增游戏功能
 
@@ -61,34 +66,24 @@ Minecraft PE 0.6.1 Windows Universal
 * 触摸屏潜行选项
 
 * F3 调试界面
-  
-  
-  
-  
 
-![Java Beta 视觉效果下的无限世界](docs/beta_inf.png)
+![loading-ag-2043](docs/pe_inf.png)
 
-![原版 PE 视觉效果下的无限世界](docs/pe_inf.png)
+![Java Beta视觉效果下的无限世界](docs/beta_inf.png)
 
-原版 PE 视觉效果与 Java Beta 视觉效果对比
-
-
+<div align="center">原版 PE 视觉效果与 Java Beta 视觉效果对比</div>
 
 ![触摸屏潜行](docs/sneak.png)
 
-触摸输入模式下的潜行功能
-
-
+<div align="center">触摸输入模式下的潜行功能</div>
 
 ![皮肤设置](docs/skin.png)
 
-自定义皮肤
-
-
+<div align="center">自定义皮肤</div>
 
 ![F3 调试界面](docs/F3.png)
 
-F3 调试界面
+<div align="center">F3 调试界面</div>
 
 ### 改进
 
@@ -115,26 +110,18 @@ F3 调试界面
 * Q：丢弃物品
 
 * 可调整渲染距离和平滑光照
-  
-  
-  
-  
 
 ![触摸输入模式主界面](docs/touch_main.png)
 
 ![键盘鼠标模式主界面](docs/keyboard_main.png)
 
-不同输入模式下的主界面
-
-
-
-
+<div align="center">不同输入模式下的主界面</div>
 
 ![触摸输入模式游戏画面](docs/touch_game.png)
 
 ![键盘鼠标模式游戏画面](docs/keyboard_game.png)
 
-不同输入模式下的游戏画面
+<div align="center">不同输入模式下的游戏画面</div>
 
 ### 界面与自定义
 
@@ -142,8 +129,9 @@ F3 调试界面
 
 * 可调整 GUI 和方向键大小
 
-世界类型
-----
+---
+
+<h2 align="center">世界类型</h2>
 
 **重要提醒：** Infinite（无限）和 Sky（天域）世界采用的存档格式既不同于原版 MCPE 0.6.1，也不同于 MCPE 0.9 等后续版本的无限世界。因此，目前这两种世界**无法**转换并在任何原版 MCPE 中打开。未来计划开发将 Infinite/Sky 世界转换至后续 MCPE 版本的工具。
 
@@ -172,18 +160,16 @@ F3 调试界面
 * 浮岛最低的方块大约位于 Y = 18，因此在 Java 版原始 Sky 世界中钻石无法生成。本项目调整了矿石生成高度，使矿石可以在实际存在方块的高度范围内生成，故可以找到钻石。
 
 * 为平衡难度，敌对生物只有在光照足够低，并且 Y 轴上方至少存在一个方块时才会生成。这意味着夜间的露天区域不会生成敌对生物。
-  
-  
-  
-  
 
 ![Java Beta 视觉效果下的 Sky 世界](docs/beta_sky.png)
 
 ![原版 PE 视觉效果下的 Sky 世界](docs/pe_sky.png)
 
-天域在原版 PE 与 Java Beta 视觉效果下的对比
+<div align="center">天域在 Java Beta 与PE视觉效果下的对比</div>
 
-## 改进与 Bug 修复
+---
+
+<h2 align="center">改进与 Bug 修复</h2>
 
 ### 继承自 Project B 的修复
 
@@ -223,8 +209,9 @@ F3 调试界面
 
 * 修复下界反应器在 Infinite 和 Sky 世界中导致游戏无响应的问题。
 
-构建
---
+---
+
+<h2 align="center">构建</h2>
 
 打开目标架构对应的 Visual Studio 解决方案：
 
@@ -245,7 +232,11 @@ F3 调试界面
 
 未来可能会考虑加入 Direct3D 9 渲染后端，但进一步开发 ARM32 目前并非项目的优先事项。
 
-## 键盘操作
+---
+
+<h2 align="center">键盘操作</h2>
+
+<div align="center">
 
 | 按键 / 操作    | 功能           |
 | ---------- | ------------ |
@@ -266,8 +257,11 @@ F3 调试界面
 | F5         | 切换第三人称视角     |
 | Escape     | 暂停 / 返回      |
 
-已知限制
-----
+</div>
+
+---
+
+<h2 align="center">已知限制</h2>
 
 * Windows 上尚未实现“Vibrate on Destroy（破坏时振动）”。
 
@@ -277,8 +271,9 @@ F3 调试界面
 
 * 部分选项和资源路径为 Windows Universal 移植版特有。
 
-未来计划
-----
+---
+
+<h2 align="center">未来计划</h2>
 
 * UWP 支持
 
@@ -290,8 +285,9 @@ F3 调试界面
 
 * （待定）将 ARM32 的渲染后端迁移至 D3D9；目前并非开发重点
 
-署名与声明
------
+---
+
+<h2 align="center">署名与声明</h2>
 
 本仓库是基于泄露的 Minecraft Pocket Edition 0.6.1 源代码以及相关社区项目开发的独立延续项目。重新分发源代码或衍生项目时，请保留对上游项目的引用。
 

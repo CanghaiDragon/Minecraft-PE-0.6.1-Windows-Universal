@@ -1,12 +1,16 @@
-# Minecraft PE 0.6.1 Windows Universal
+<h1 align="center">Minecraft PE 0.6.1 Windows Universal</h1>
 
-[简体中文](README_zh-CN.md)
+<div align="center"><a href="README_zh-CN.md">简体中文</a></div>
 
 This project is a Windows-focused continuation of the leaked Minecraft Pocket Edition 0.6.1 source code. It modernizes and maintains the game for Windows x86, x64 and ARM64, while adding input, rendering, world-generation and user-interface improvements.
 
 This project is intended for educational and preservation purposes only. Feel free to fork this project, but **DO NOT** use it for commercial purposes.
 
-## Project status
+---
+
+<h2 align="center">Project status</h2>
+
+<div align="center">
 
 | Target        | Status                                     | Build system  |
 | ------------- | ------------------------------------------ | ------------- |
@@ -15,9 +19,13 @@ This project is intended for educational and preservation purposes only. Feel fr
 | Windows ARM64 | Supported                                  | Visual Studio |
 | Windows ARM32 | Experimental; runs on selected WOA devices | Visual Studio |
 
+</div>
+
 The project is primarily developed and tested on Windows. Other platforms from the upstream projects are not official targets of this repository.
 
-## Upstream projects and references
+---
+
+<h2 align="center">Upstream projects and references</h2>
 
 In March 2026, the source code of Minecraft Pocket Edition v0.6.1 was leaked on the Internet. You can find it at [Minecraft PE Source Code](https://archive.org/details/Minecraftpesorucecode). This is the reason why several revisions of MCPE0.6.1 appears on github and other sites. This project is also a revision of the origin code. All the revisions **DO NOT** have direct authorization from Mojang.
 
@@ -29,7 +37,9 @@ The Sky world and several visual behaviors were implemented with reference to Mi
 
 The main work of this project is assisted with the help of Codex.
 
-## Features
+---
+
+<h2 align="center">Features</h2>
 
 ### Original MCPE features
 
@@ -39,7 +49,7 @@ The main work of this project is assisted with the help of Codex.
 
 ![Nether Reactor](docs/nether_reactor.png)
 
-The terminated Nether Reactor Towel
+<div align="center">The terminated Nether Reactor Towel</div>
 
 ### New gaming features
 
@@ -55,23 +65,23 @@ The features below can be experienced after opening the corresponding settings i
 
 - F3 Debug Screen
 
-![Infinite world with Java Beta visuals](docs/beta_inf.png)
+![loading-ag-568](docs/pe_inf.png)
 
-![Infinite world with original PE visuals](docs/pe_inf.png)
+![loading-ag-569](docs/beta_inf.png)
 
-Difference view of original PE visual and Java Beta visual
+<div align="center">Difference view of original PE visual and Java Beta visual</div>
 
 ![Touch sneak](docs/sneak.png)
 
-Ability to sneak under touch input
+<div align="center">Ability to sneak under touch input</div>
 
 ![Skin settings](docs/skin.png)
 
-Optimized skin
+<div align="center">Optimized skin</div>
 
 ![F3 debug screen](docs/F3.png)
 
-F3 Debug Screen
+<div align="center">F3 Debug Screen</div>
 
 ### Improvements
 
@@ -92,20 +102,22 @@ F3 Debug Screen
 
 ![Keyboard and mouse main screen](docs/keyboard_main.png)
 
-Different main page under different input mode
+<div align="center">Different main page under different input mode</div>
 
 ![Touch gameplay](docs/touch_game.png)
 
 ![Keyboard and mouse gameplay](docs/keyboard_game.png)
 
-Different gaming screenshots under different input mode
+<div align="center">Different gaming screenshots under different input mode</div>
 
 ### Interface and customization
 
 - Welcome screen for choosing input mode and GUI scale
 - Adjustable GUI and D-pad sizes
 
-## World types
+---
+
+<h2 align="center">World types</h2>
 
 **IMPORTANT**: Infinite and Sky world have a level saving format different from both the original MCPE 0.6.1 and later MCPE infinite versions like 0.9. Therefore, these two types of world **CANNOT** be converted and opened in any versions of original MCPE at the moment. Future plans include Infinite/Sky world conversion tools for later MCPE versions.
 
@@ -135,9 +147,11 @@ Sky world is a floating-island world type based on the unused Sky dimension logi
 
 ![Sky world with original PE visuals](docs/pe_sky.png)
 
-Difference view of Sky world under PE and Java Beta visual
+<div align="center">Difference view of Sky world under Java Beta and PE visual</div>
 
-## Improvements and bug fixes
+---
+
+<h2 align="center">Improvements and bug fixes</h2>
 
 ### Fixes inherited from Project B
 
@@ -162,7 +176,9 @@ Difference view of Sky world under PE and Java Beta visual
 * Fixed Nether Reactor may crash the game when running.
 * Fixed Nether Reactor lead to no response in Infinite and Sky world.
 
-## Building
+---
+
+<h2 align="center">Building</h2>
 
 Open the corresponding Visual Studio solution:
 
@@ -183,7 +199,11 @@ I do not own a Windows RT device, so compatibility with devices such as the Surf
 
 A Direct3D 9 rendering backend may be considered in the future, but further ARM32 development is not currently a priority.
 
-## Keyboard Controls
+---
+
+<h2 align="center">Keyboard Controls</h2>
+
+<div align="center">
 
 | Key / Action | Function                    |
 | ------------ | --------------------------- |
@@ -204,14 +224,20 @@ A Direct3D 9 rendering backend may be considered in the future, but further ARM3
 | F5           | Toggle third-person view    |
 | Escape       | Pause / back                |
 
-## Known limitations
+</div>
+
+---
+
+<h2 align="center">Known limitations</h2>
 
 - Vibrate on Destroy is not implemented on Windows.
 - Skin changes may require restarting the game.
 - ARM32 remains experimental and have performance and rendering compatibility issues.
 - Some options and resource paths are specific to the Windows Universal port.
 
-## Future plans
+---
+
+<h2 align="center">Future plans</h2>
 
 - UWP support
 - Chinese localization
@@ -219,7 +245,9 @@ A Direct3D 9 rendering backend may be considered in the future, but further ARM3
 - Infinite/Sky world conversion tools for later MCPE versions
 - Possible D3D9 rendering backend migration for ARM32; this is not a current priority
 
-## Attribution
+---
+
+<h2 align="center">Attribution</h2>
 
 This repository is an independent continuation based on leaked Minecraft Pocket Edition 0.6.1 source code and related community projects. Please retain the upstream references when redistributing source code or derivative work.
 
