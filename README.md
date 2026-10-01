@@ -81,6 +81,8 @@ The features below can be experienced after opening the corresponding settings i
 
 ![F3 debug screen](docs/F3.png)
 
+![F3 toggle](docs/F3_enter.png)
+
 <div align="center">F3 Debug Screen</div>
 
 ### Improvements

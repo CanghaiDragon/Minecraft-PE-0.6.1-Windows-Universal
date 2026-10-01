@@ -83,6 +83,8 @@
 
 ![F3 调试界面](docs/F3.png)
 
+![5b169608-03e3-4051-a833-404e412d7643](file:///C:/Users/dufu2/Pictures/Typedown/5b169608-03e3-4051-a833-404e412d7643.png)
+
 <div align="center">F3 调试界面</div>
 
 ### 改进
