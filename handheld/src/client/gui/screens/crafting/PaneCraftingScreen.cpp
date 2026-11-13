@@ -39,8 +39,9 @@ public:
 	void renderBg(Minecraft* minecraft, int xm, int ym) {
 		//fill(x+1, y+1, x+w-1, y+h-1, 0xff999999);
 		
-		bool hovered = active && (minecraft->useTouchscreen()?
-			(_currentlyDown && xm >= x && ym >= y && xm < x + width && ym < y + height) : false);
+		bool hovered = active &&
+			(_currentlyDown || (xm >= x && ym >= y &&
+			xm < x + width && ym < y + height));
 
 		if (hovered || *selectedPtr == this)
 			statePressed->draw(Tesselator::instance, (float)x, (float)y);
@@ -428,6 +429,26 @@ void PaneCraftingScreen::keyPressed( int eventKey )
 	}
 }
 
+void PaneCraftingScreen::mouseClicked(int x, int y, int buttonNum)
+{
+	super::mouseClicked(x, y, buttonNum);
+	if (pane)
+		pane->mouseClicked((float)x, (float)y, buttonNum);
+}
+
+void PaneCraftingScreen::mouseMoved(int x, int y)
+{
+	if (pane)
+		pane->mouseMoved((float)x, (float)y);
+}
+
+void PaneCraftingScreen::mouseReleased(int x, int y, int buttonNum)
+{
+	if (pane)
+		pane->mouseReleased((float)x, (float)y, buttonNum);
+	super::mouseReleased(x, y, buttonNum);
+}
+
 void PaneCraftingScreen::mouseScrolled(int x, int y, int delta)
 {
 	if (pane && x >= paneRect.x && x < paneRect.x + paneRect.w &&
@@ -552,8 +573,9 @@ void CraftButton::renderBg(Minecraft* minecraft, int xm, int ym) {
 		return;
 	//fill(x+1, y+1, x+w-1, y+h-1, 0xff999999);
 
-	bool hovered = active && (minecraft->useTouchscreen()?
-		(_currentlyDown && xm >= x && ym >= y && xm < x + width && ym < y + height) : false);
+	bool hovered = active &&
+		(_currentlyDown || (xm >= x && ym >= y &&
+		xm < x + width && ym < y + height));
 
 	if (hovered || selected)
 		bgSelected->draw(Tesselator::instance, (float)x, (float)y);

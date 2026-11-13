@@ -13,6 +13,7 @@ public:
 	StringVector getOptionStrings();
 	void setSettingsPath(const std::string& path);
 	bool exists() const;
+	void remove();
 
 private:
 	std::string settingsPath;

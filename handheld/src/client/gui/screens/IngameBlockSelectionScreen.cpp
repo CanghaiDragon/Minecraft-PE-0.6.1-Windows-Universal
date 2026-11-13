@@ -10,6 +10,7 @@
 #include "../Gui.h"
 #include "../../renderer/Textures.h"
 #include "../../gamemode/GameMode.h"
+#include "../../../util/Mth.h"
 #include "ArmorScreen.h"
 #include "crafting/WorkbenchScreen.h"
 #include "../components/Button.h"
@@ -177,7 +178,7 @@ void IngameBlockSelectionScreen::keyPressed(int eventKey)
 {
 	// E and Esc both close the keyboard/mouse inventory. Screen input consumes
 	// these events before Minecraft::tickInput can otherwise open PauseScreen.
-	if (!minecraft->useTouchscreen() &&
+	if (minecraft->options.javaUi &&
 		(eventKey == Keyboard::KEY_E || eventKey == Keyboard::KEY_ESCAPE)) {
 		minecraft->setScreen(NULL);
 		return;
@@ -272,6 +273,24 @@ void IngameBlockSelectionScreen::mouseReleased(int x, int y, int buttonNum)
 	}
 	if (!_pendingQuit)
 		super::mouseReleased(x, y, buttonNum);
+}
+
+void IngameBlockSelectionScreen::mouseScrolled(int x, int y, int delta)
+{
+	(void)x;
+	(void)y;
+	if (delta == 0 || InventorySize <= 0)
+		return;
+
+	// The Java-style inventory is a fixed grid. Treat the wheel as vertical
+	// cursor movement while preserving the current column.
+	const int column = selectedItem % InventoryCols;
+	const int row = selectedItem / InventoryCols;
+	const int direction = delta > 0 ? -1 : 1;
+	const int targetRow = Mth::clamp(row + direction, 0, InventoryRows - 1);
+	const int target = Mth::Min(targetRow * InventoryCols + column, InventorySize - 1);
+	if (isAllowed(target))
+		selectedItem = target;
 }
 
 void IngameBlockSelectionScreen::selectSlotAndClose()

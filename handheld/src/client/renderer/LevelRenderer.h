@@ -47,6 +47,9 @@ public:
 	void renderBetaSky(float alpha);
 	void renderClouds(float alpha);
 	void renderBetaClouds(float alpha);
+	bool isXrayRenderActive() const { return xrayRenderActive; }
+	bool isSnowWeatherActive(Mob* player) const;
+	void renderSnowWeather(Mob* player, float alpha);
 	void renderEntities(Vec3 cam, Culler* culler, float a);
     void renderSameAsLast(int layer, float alpha);
 	void renderHit(Player* player, const HitResult& h, int mode, /*ItemInstance*/void* inventoryItem, float a);
@@ -56,6 +59,7 @@ public:
 
 	void tick();
 	bool updateDirtyChunks(Mob* player, bool force);
+	void updateXrayRenderState(Mob* player);
 	void setDirty(int x0, int y0, int z0, int x1, int y1, int z1);
     void tileChanged(int x, int y, int z);
     void setTilesDirty(int x0, int y0, int z0, int x1, int y1, int z1);
@@ -117,6 +121,7 @@ private:
 	int lastViewDistance;
 
 	int ticks;
+	bool xrayRenderActive;
     int starList, skyList, darkList;
 
 	int numListsOrBuffers;

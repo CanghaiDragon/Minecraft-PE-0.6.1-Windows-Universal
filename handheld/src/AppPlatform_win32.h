@@ -23,7 +23,21 @@ public:
     }
 
 	BinaryBlob readAssetFile(const std::string& filename) {
-		FILE* fp = fopen(("data/" + filename).c_str(), "r");
+		// Runtime assets are deployed beside the executable.  Visual Studio's
+		// working directory is not stable across configurations, so do not make
+		// language files and other non-texture assets depend on it.
+		char executablePath[MAX_PATH] = {0};
+		DWORD length = GetModuleFileNameA(NULL, executablePath, MAX_PATH);
+		std::string executableDirectory(executablePath, length);
+		std::string::size_type slash = executableDirectory.find_last_of("\\/");
+		if (slash != std::string::npos)
+			executableDirectory.erase(slash + 1);
+		else
+			executableDirectory.clear();
+
+		FILE* fp = fopen((executableDirectory + "data/" + filename).c_str(), "rb");
+		if (!fp)
+			fp = fopen(("data/" + filename).c_str(), "rb");
 		if (!fp)
 			return BinaryBlob();
 

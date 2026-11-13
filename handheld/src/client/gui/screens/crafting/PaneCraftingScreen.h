@@ -51,6 +51,9 @@ public:
     bool closeOnPlayerHurt();
 	void buttonClicked(Button* button);
 	void keyPressed( int eventKey );
+	void mouseClicked(int x, int y, int buttonNum);
+	void mouseMoved(int x, int y);
+	void mouseReleased(int x, int y, int buttonNum);
 	void mouseScrolled(int x, int y, int delta);
 
 	// IItemPaneCallback

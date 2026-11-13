@@ -181,6 +181,14 @@ void Inventory::setupDefault() {
 		addItem(new ItemInstance(Tile::glass));
         addItem(new ItemInstance(Tile::lightGem));
 
+		// Source liquid blocks and the remaining snow/ice forms are available
+		// in the UWP creative catalogue as well.  These are block instances,
+		// not the bucket items, so they can be placed directly from the list.
+		addItem(new ItemInstance(Tile::water));
+		addItem(new ItemInstance(Tile::lava));
+		addItem(new ItemInstance(Tile::topSnow));
+		addItem(new ItemInstance(Tile::ice));
+
 		addItem(new ItemInstance(Tile::netherReactor));
 		
 		addItem(new ItemInstance(Tile::cloth, 1, 0));

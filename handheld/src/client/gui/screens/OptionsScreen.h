@@ -16,7 +16,8 @@ class OptionsScreen: public Screen
 	void generateOptionScreens();
 
 public:
-	OptionsScreen();
+	// Show only the existing skin option pane when entered from the start menu.
+	OptionsScreen(bool skinOnly = false);
 	~OptionsScreen();
 	void setupPositions();
 	void buttonClicked( Button* button );
@@ -39,6 +40,8 @@ private:
 	OptionsPane* currentOptionPane;
 	TextBox* usernameBox;
 	int selectedCategory;
+	bool _resettingOptions;
+	bool _skinOnly;
 
 	// Sidebar scroll state
 	float _catScrollY;

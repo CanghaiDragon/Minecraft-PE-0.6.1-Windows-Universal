@@ -62,7 +62,7 @@ void PauseScreen::init() {
 	entityButtonState = minecraft->options.renderDebug;
 	bEntityButton.setImageDef(entityButtonState ? entityButtonOn : entityButtonOff, false);
 
-	if (minecraft->useTouchscreen()) {
+	if (!minecraft->options.javaUi) {
 		bContinue = new Touch::TButton(1, "Back to game");
 		bQuit = new Touch::TButton(2, "Quit to title");
 		bQuitAndSaveLocally = new Touch::TButton(3, "Quit and copy map");

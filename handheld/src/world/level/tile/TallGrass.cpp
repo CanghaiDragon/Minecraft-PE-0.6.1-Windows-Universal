@@ -3,6 +3,7 @@
 #include "../GrassColor.h"
 #include "../LevelSource.h"
 #include "../biome/BiomeSource.h"
+#include "../biome/Biome.h"
 #include "../../entity/player/Player.h"
 #include "../../item/Item.h"
 #include "../../item/ShearsItem.h"
@@ -36,6 +37,9 @@ int TallGrass::getColor( LevelSource* level, int x, int y, int z ) {
 	if (d == DEAD_SHRUB) return 0xffffff;
 
 	if (Tile::useBetaVisuals()) {
+		Biome* biome = level->getBiome(x, z);
+		if (biome == Biome::alpha || biome == Biome::winter)
+			return biome->grassColor;
 		level->getBiomeSource()->getBiomeBlock(x, z, 1, 1);
 		return GrassColor::get(level->getBiomeSource()->temperatures[0],
 			level->getBiomeSource()->downfalls[0]);

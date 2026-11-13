@@ -6,6 +6,7 @@
 #include "TransparentTile.h"
 #include "../Level.h"
 #include "../biome/BiomeSource.h"
+#include "../biome/Biome.h"
 #include "../material/Material.h"
 #include "../../item/Item.h"
 #include "../../item/ItemInstance.h"
@@ -50,6 +51,13 @@ public:
     }
 
     int getColor(LevelSource* level, int x, int y, int z) {
+		const bool useAlphaLeafMaterial =
+			(Tile::useAlphaTextures()
+				|| level->getBiome(x, z) == Biome::alpha
+				|| level->getBiome(x, z) == Biome::winter)
+			&& (!Tile::useBetaVisuals() || allowSame);
+		if (useAlphaLeafMaterial)
+			return 0xffffff;
 
         int data = (level->getData(x, y, z) & LEAF_TYPE_MASK);
         if (data == EVERGREEN_LEAF) {
@@ -197,7 +205,11 @@ public:
     }
 
 	int getTexture(int face, int data) {
-		if (Tile::useBetaVisuals()) {
+		if (Tile::useAlphaTextures()
+			&& (!Tile::useBetaVisuals() || allowSame))
+			return Tile::ALPHA_LEAVES_TEXTURE;
+
+        if (Tile::useBetaVisuals() && allowSame) {
 			int type = data & LEAF_TYPE_MASK;
 			// Beta foliage uses the grayscale leaf tiles added to the two
 			// otherwise-unused terrain slots 142 and 143. PE visuals keep

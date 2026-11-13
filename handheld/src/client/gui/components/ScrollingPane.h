@@ -51,6 +51,12 @@ public:
 	void tick();
 	void render(int xm, int ym, float alpha);
 	void mouseScrolled(int delta);
+	// Desktop pointer events are delivered before the frame is rendered.  The
+	// original pane also has a render-time polling path for touch input; these
+	// entry points keep the same tracking state usable by PE UI on desktop.
+	void mouseClicked(float x, float y, int buttonNum);
+	void mouseMoved(float x, float y);
+	void mouseReleased(float x, float y, int buttonNum);
 
 	bool getGridItemFor_slow(int itemIndex, GridItem& out);
 

@@ -24,6 +24,16 @@ static int _bedEnemies[] = {
 
 static const std::vector<int> bedEnemies(_bedEnemies, _bedEnemies + sizeof(_bedEnemies) / sizeof(_bedEnemies[0]));
 
+static int getEffectiveMobCap(const MobCategory& category, int worldType) {
+	const int baseCap = category.getMaxInstancesPerLevel();
+	if (worldType != WorldType::Sky || &category != &MobCategory::monster)
+		return baseCap;
+
+	// Keep the Sky hostile-mob population at half of the normal cap.
+	const int reducedCap = baseCap / 2;
+	return reducedCap > 0 ? reducedCap : 1;
+}
+
 static int getLowestSkyMonsterSpawnY(Level* level, int x, int z) {
 	// Require two standable layers in the same column. A bare island has only
 	// its exposed top surface; a cave or recessed ledge has a lower floor plus
@@ -112,11 +122,17 @@ int MobSpawner::tick(Level* level, bool spawnEnemies, bool spawnFriendlies) {
             continue;
 
 		int numMobs = level->countInstanceOfBaseType(mobCategory.getBaseClassId());
-		if (numMobs > mobCategory.getMaxInstancesPerLevel())
+		const int maxInstancesPerLevel =
+			getEffectiveMobCap(mobCategory, worldType);
+		if (worldType == WorldType::Sky
+			? numMobs >= maxInstancesPerLevel
+			: numMobs > maxInstancesPerLevel)
 		    continue;
 		//LOGI("NumMobs: %d of Category: %d\n", numMobs, mobCategory.getBaseClassId());
 chunkLoop:
 		for(std::map<ChunkPos, bool>::iterator it = chunksToPoll.begin(); it != chunksToPoll.end(); ++it) {
+			if (worldType == WorldType::Sky && numMobs >= maxInstancesPerLevel)
+				break;
 			const ChunkPos& cp = it->first;
             TilePos start = getRandomPosWithin(level, cp.x * 16, cp.z * 16);
             int xStart = start.x;
@@ -143,6 +159,8 @@ chunkLoop:
 				int currentCreatureCount = 0;
 
                 for (int ll = 0; ll < 4; ll++) {
+					if (worldType == WorldType::Sky && numMobs >= maxInstancesPerLevel)
+						goto chunkLoop;
 					if (currentCreatureCount > maxCreatureCount)
 						break;
 
@@ -182,7 +200,9 @@ chunkLoop:
 							// probability weight.
 							if (&mobCategory == &MobCategory::monster) {
 								int typeCount = level->countInstanceOfType(currentMobType.mobClassId);
-								int typeMax = (int)(1.5f * currentMobType.randomWeight * mobCategory.getMaxInstancesPerLevel()) / Biome::defaultTotalEnemyWeight;
+								int typeMax = (int)(1.5f * currentMobType.randomWeight * maxInstancesPerLevel) / Biome::defaultTotalEnemyWeight;
+								if (worldType == WorldType::Sky && typeMax < 1)
+									typeMax = 1;
 								//LOGI("Has %d (max %d) of type: %d\n", typeCount, typeMax, currentMobType.mobClassId);
 								if (typeCount >= typeMax)
 									break;
@@ -202,6 +222,8 @@ chunkLoop:
 
 						if (addMob(level, mob, xx, yy, zz, level->random.nextFloat() * 360, 0, false)) {
 							++currentCreatureCount;
+							if (worldType == WorldType::Sky)
+								++numMobs;
 							if (++clusterSize >= mob->getMaxSpawnClusterSize()) goto chunkLoop;
 						}
 						else

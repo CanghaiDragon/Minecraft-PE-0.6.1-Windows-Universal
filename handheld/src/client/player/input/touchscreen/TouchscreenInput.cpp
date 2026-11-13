@@ -308,11 +308,25 @@ void TouchscreenInput_TestFps::tick( Player* player )
 	// second camera finger can change which contact drives movement.
 	if (_dpadPointerId >= 0 && !Multitouch::isPointerDown(_dpadPointerId))
 		_dpadPointerId = -1;
+	// With Touch Sneak enabled, the center button belongs to the left D-pad
+	// while AREA_DPAD_J is a separate right-side jump button.  A jump contact
+	// must not become the movement lock, otherwise the left D-pad contact is
+	// discarded as a secondary pointer.
+	if (_options->touchSneak && _dpadPointerId >= 0) {
+		const int primaryAreaId = _model.getPointerId(
+			Multitouch::getX(_dpadPointerId), Multitouch::getY(_dpadPointerId), _dpadPointerId);
+		if (primaryAreaId < AREA_DPAD_N || primaryAreaId > AREA_DPAD_C)
+			_dpadPointerId = -1;
+	}
 	if (_dpadPointerId < 0) {
 		for (int i = 0; i < pointerCount; ++i) {
 			int p = pointerIds[i];
 			int areaId = _model.getPointerId(Multitouch::getX(p), Multitouch::getY(p), p);
-			if (Multitouch::isPressed(p) && areaId >= AREA_DPAD_N && areaId <= AREA_FLIGHT_DOWN) {
+			const bool isLegacyDpadArea = areaId >= AREA_DPAD_N && areaId <= AREA_FLIGHT_DOWN;
+			const bool isTouchSneakDpadArea = areaId >= AREA_DPAD_N && areaId <= AREA_DPAD_C;
+			if (Multitouch::isPressed(p) &&
+				((!_options->touchSneak && isLegacyDpadArea) ||
+				 (_options->touchSneak && isTouchSneakDpadArea))) {
 				_dpadPointerId = p;
 				break;
 			}
@@ -345,10 +359,12 @@ void TouchscreenInput_TestFps::tick( Player* player )
 		{
 			continue;
 		}
-		// Flight uses the right-side jump key together with the D-Pad's
-		// vertical directions, so allow multiple D-Pad contacts in that mode.
+		// Flight uses multiple D-Pad contacts. Touch Sneak also has a separate
+		// right-side jump contact, which must be accepted alongside the left
+		// movement contact even when the player is not flying.
+		const bool touchSneakJump = _options->touchSneak && areaId == AREA_DPAD_J;
 		if (areaId != AREA_PAUSE && p != _dpadPointerId &&
-			!player->abilities.flying)
+			!player->abilities.flying && !touchSneakJump)
 			continue;
 
 		bool setButton = false;
@@ -408,6 +424,11 @@ void TouchscreenInput_TestFps::tick( Player* player )
 			else {
 				if (!isChangingFlightHeight) tmpForward = true;
 				ya += 1;
+				// In the original D-pad layout, pressing forward while swimming
+				// also applies the upward swimming impulse.
+				if (!_options->touchSneak && !player->abilities.flying &&
+					player->isInWater())
+					jumping = true;
 			}
 		}
 		else if (areaId == AREA_DPAD_S && !_forward)

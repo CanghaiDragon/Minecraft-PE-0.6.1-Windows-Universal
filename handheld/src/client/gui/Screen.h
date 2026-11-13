@@ -56,6 +56,7 @@ protected:
 	virtual void buttonClicked(Button* button) {}
 	virtual void mouseClicked(int x, int y, int buttonNum);
 	virtual void mouseReleased(int x, int y, int buttonNum);
+	virtual void mouseMoved(int x, int y) {}
 	// Receives one unit per mouse-wheel notch in GUI coordinates.
 	virtual void mouseScrolled(int x, int y, int delta) {}
 

@@ -34,9 +34,12 @@ private:
 
 	Touch::TButton touchButton;
 	Touch::TButton keyboardButton;
+	Touch::TButton defaultProfileButton;
+	Touch::TButton lowPerformanceProfileButton;
 	Touch::TButton guiScaleButton;
 	Touch::TButton continueButton;
 	bool touchControls;
+	Options::DefaultProfile defaultProfile;
 	int guiScale;
 	float scrollY;
 	int contentHeight;

@@ -248,6 +248,9 @@
     <ClCompile Include="..\..\src\world\level\levelgen\RandomLevelSource.cpp">
       <Filter>Source Files\world\level\levelgen</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\world\level\levelgen\AlphaLevelSource.cpp">
+      <Filter>Source Files\world\level\levelgen</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\world\level\levelgen\SkyLevelSource.cpp">
       <Filter>Source Files\world\level\levelgen</Filter>
     </ClCompile>
@@ -1364,6 +1367,9 @@
       <Filter>Source Files\world\level\levelgen</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\world\level\levelgen\RandomLevelSource.h">
+      <Filter>Source Files\world\level\levelgen</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\world\level\levelgen\AlphaLevelSource.h">
       <Filter>Source Files\world\level\levelgen</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\world\level\levelgen\SkyLevelSource.h">

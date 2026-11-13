@@ -4,6 +4,7 @@
 //package net.minecraft.world.level.tile;
 
 #include "Tile.h"
+#include "../LevelSource.h"
 #include "../material/Material.h"
 #include "../LightLayer.h"
 #include "../../../util/Random.h"
@@ -17,6 +18,25 @@ public:
 	{
         friction = 0.98f;
         setTicking(true);
+    }
+
+    // Java Beta's translucent ice path is tied to Fancy graphics. Keep the
+    // original opaque PE path for PE visuals and Beta+Fast.
+    int getRenderLayer() {
+        return Tile::useBetaFancyGraphics()
+            ? Tile::RENDERLAYER_BLEND
+            : Tile::RENDERLAYER_OPAQUE;
+    }
+
+    bool isSolidRender() {
+        return !Tile::useBetaFancyGraphics();
+    }
+
+    bool shouldRenderFace(LevelSource* level, int x, int y, int z, int face) {
+        // Match BlockBreakable(false): adjacent ice cubes share one surface.
+        if (Tile::useBetaFancyGraphics() && level->getTile(x, y, z) == this->id)
+            return false;
+        return Tile::shouldRenderFace(level, x, y, z, face);
     }
 
     void playerDestroy(Level* level, Player* player, int x, int y, int z, int data) {

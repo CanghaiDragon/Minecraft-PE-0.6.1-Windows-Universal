@@ -3,6 +3,7 @@
 
 #include "../Screen.h"
 #include "../components/Button.h"
+#include "../components/ImageButton.h"
 
 class StartMenuScreen: public Screen
 {
@@ -27,6 +28,7 @@ private:
 	Button bJoin;
 	Button bOptions;
 	Button bQuit;
+	ImageButton bSkin;
 	Button bTest;
 	Button bBuy;
 

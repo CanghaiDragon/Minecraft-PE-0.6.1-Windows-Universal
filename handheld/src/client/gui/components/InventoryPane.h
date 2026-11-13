@@ -21,6 +21,7 @@ public:
 	~InventoryPane();
 
 	void tick();
+	void mouseClicked(float x, float y, int buttonNum);
 	void renderBatch( std::vector<GridItem>& item, float alpha );
 	bool onSelect( int gridId, bool selected );
 	void drawScrollBar( ScrollBar& hScroll );
@@ -53,6 +54,9 @@ class IInventoryPaneCallback
 public:
 	virtual ~IInventoryPaneCallback() {}
 	virtual bool addItem(const InventoryPane* forPane, int index) = 0;
+	// Desktop Shift-click: transfer the complete stack represented by this
+	// pane item to the other side of the container.
+	virtual bool quickMoveItem(const InventoryPane* forPane, int index) { return false; }
 	virtual bool isAllowed( int slot ) = 0;
 	virtual std::vector<const ItemInstance*> getItems(const InventoryPane* forPane) = 0;
 };

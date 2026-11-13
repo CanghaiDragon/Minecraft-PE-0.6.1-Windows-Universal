@@ -76,10 +76,20 @@ void ImageButton::render(Minecraft* minecraft, int xm, int ym) {
 			if (src) {
 				const TextureData* d = minecraft->textures->getTemporaryTextureData(texId);
 				if (d != NULL) {
-					float u0 = (src->x+(IsSecondImage?src->w:0)) / (float)d->w;
-					float u1 = (src->x+(IsSecondImage?2*src->w:src->w)) / (float)d->w;
-					float v0 = src->y / (float)d->h;
-					float v1 = (src->y+src->h) / (float)d->h;
+					const int stateX = IsSecondImage
+						? (_imageDef.secondImageVertical
+							? _imageDef.secondImageStepX
+							: src->w)
+						: 0;
+					const int stateY = IsSecondImage
+						? (_imageDef.secondImageVertical
+							? (_imageDef.secondImageStepY > 0 ? _imageDef.secondImageStepY : src->h)
+							: 0)
+						: 0;
+					float u0 = (src->x + stateX) / (float)d->w;
+					float u1 = (src->x + stateX + src->w) / (float)d->w;
+					float v0 = (src->y + stateY) / (float)d->h;
+					float v1 = (src->y + stateY + src->h) / (float)d->h;
 					t.vertexUV(cx-hx, cy-hy, blitOffset, u0, v0);
 					t.vertexUV(cx-hx, cy+hy, blitOffset, u0, v1);
 					t.vertexUV(cx+hx, cy+hy, blitOffset, u1, v1);

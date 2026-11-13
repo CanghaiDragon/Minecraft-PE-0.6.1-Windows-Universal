@@ -11,9 +11,12 @@
 WelcomeScreen::WelcomeScreen()
 :	touchButton(1, "Touch Controls"),
 	keyboardButton(2, "Keyboard & Mouse"),
-	guiScaleButton(3, "GUI Scale"),
-	continueButton(5, "Continue"),
+	defaultProfileButton(3, "Desktop Default"),
+	lowPerformanceProfileButton(4, "Desktop Low Performance"),
+	guiScaleButton(5, "GUI Scale"),
+	continueButton(6, "Continue"),
 	touchControls(true),
+	defaultProfile(Options::DefaultProfile::DesktopDefault),
 	guiScale(0),
 	scrollY(0),
 	contentHeight(0),
@@ -30,6 +33,8 @@ void WelcomeScreen::init()
 
 	buttons.push_back(&touchButton);
 	buttons.push_back(&keyboardButton);
+	buttons.push_back(&defaultProfileButton);
+	buttons.push_back(&lowPerformanceProfileButton);
 	buttons.push_back(&guiScaleButton);
 	buttons.push_back(&continueButton);
 	updateSelection();
@@ -44,14 +49,19 @@ void WelcomeScreen::setupPositions()
 	const int buttonHeight = 26;
 	const int x = (width - buttonWidth) / 2;
 
-	touchButton.x = keyboardButton.x = guiScaleButton.x = continueButton.x = x;
-	touchButton.width = keyboardButton.width = guiScaleButton.width = continueButton.width = buttonWidth;
-	touchButton.height = keyboardButton.height = guiScaleButton.height = continueButton.height = buttonHeight;
+	touchButton.x = keyboardButton.x = defaultProfileButton.x =
+		lowPerformanceProfileButton.x = guiScaleButton.x = continueButton.x = x;
+	touchButton.width = keyboardButton.width = defaultProfileButton.width =
+		lowPerformanceProfileButton.width = guiScaleButton.width = continueButton.width = buttonWidth;
+	touchButton.height = keyboardButton.height = defaultProfileButton.height =
+		lowPerformanceProfileButton.height = guiScaleButton.height = continueButton.height = buttonHeight;
 
 	touchButton.y = 66;
 	keyboardButton.y = 98;
-	guiScaleButton.y = 140;
-	continueButton.y = 172;
+	defaultProfileButton.y = 168;
+	lowPerformanceProfileButton.y = 200;
+	guiScaleButton.y = 258;
+	continueButton.y = 310;
 	contentHeight = continueButton.y + continueButton.height + 48;
 	clampScroll();
 }
@@ -86,9 +96,11 @@ void WelcomeScreen::render(int xm, int ym, float a)
 
 	drawCenteredString(font, "Choose your controls", width / 2, 38, 0xffffff);
 	drawCenteredString(font, "Touch or keyboard/mouse controls are exclusive in a world.", width / 2, 52, 0xc0c0c0);
-	drawCenteredString(font, "Adjust interface size", width / 2, 128, 0xffffff);
-	drawCenteredString(font, "You are free to change these settings at any time in options.", width / 2, 206, 0xc0c0c0);
-	drawCenteredString(font, "Don't forget to take a look at \"Additional\" in options!", width / 2, 218, 0xc0c0c0);
+	drawCenteredString(font, "Choose your base configuration", width / 2, 140, 0xffffff);
+	drawCenteredString(font, "Default or Low Performance", width / 2, 154, 0xc0c0c0);
+	drawCenteredString(font, "Adjust interface size", width / 2, 242, 0xffffff);
+	drawCenteredString(font, "You are free to change these settings at any time in options.", width / 2, 344, 0xc0c0c0);
+	drawCenteredString(font, "Don't forget to take a look at \"Additional\" in options!", width / 2, 356, 0xc0c0c0);
 	for (unsigned int i = 0; i < buttons.size(); ++i)
 		buttons[i]->render(minecraft, hoverX, hoverY + (int)scrollY);
 
@@ -197,6 +209,12 @@ void WelcomeScreen::buttonClicked(Button* button)
 	} else if (button == &keyboardButton) {
 		touchControls = false;
 		updateSelection();
+	} else if (button == &defaultProfileButton) {
+		defaultProfile = Options::DefaultProfile::DesktopDefault;
+		updateSelection();
+	} else if (button == &lowPerformanceProfileButton) {
+		defaultProfile = Options::DefaultProfile::DesktopLowPerformance;
+		updateSelection();
 	} else if (button == &guiScaleButton) {
 		guiScale = (guiScale + 1) % 5;
 		updateSelection();
@@ -205,8 +223,9 @@ void WelcomeScreen::buttonClicked(Button* button)
 		minecraft->options.set(&Options::Option::GUI_SCALE, guiScale);
 	} else if (button == &continueButton) {
 		const bool inputModeChanged = minecraft->options.useTouchScreen != touchControls;
+		minecraft->options.applyDefaultProfile(defaultProfile);
 		minecraft->options.useTouchScreen = touchControls;
-		minecraft->options.set(&Options::Option::GUI_SCALE, guiScale);
+		minecraft->options.guiScale = guiScale;
 		minecraft->options.save();
 		// reloadOptions() sees the already-updated value and therefore cannot
 		// tell that the existing TouchInputHolder must be replaced.  Use the
@@ -223,6 +242,10 @@ void WelcomeScreen::updateSelection()
 {
 	touchButton.selected = touchControls;
 	keyboardButton.selected = !touchControls;
+	defaultProfileButton.selected =
+		defaultProfile == Options::DefaultProfile::DesktopDefault;
+	lowPerformanceProfileButton.selected =
+		defaultProfile == Options::DefaultProfile::DesktopLowPerformance;
 	guiScaleButton.selected = false;
 	guiScaleButton.msg = std::string("GUI Scale: ") + I18n::get(Options::GUI_SCALE[guiScale]);
 }

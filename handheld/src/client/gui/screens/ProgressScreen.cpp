@@ -7,14 +7,15 @@
 #include "../../../SharedConstants.h"
 #include "../../renderer/Textures.h"
 
-ProgressScreen::ProgressScreen()
-:	ticks(0)
+ProgressScreen::ProgressScreen(bool savingWorld)
+:	ticks(0),
+	savingWorld(savingWorld)
 {
 }
 
 void ProgressScreen::render( int xm, int ym, float a )
 {
-	if (minecraft->isLevelGenerated()) {
+	if (!savingWorld && minecraft->isLevelGenerated()) {
 		minecraft->setScreen(NULL);
 		return;
 	}
@@ -32,6 +33,15 @@ void ProgressScreen::render( int xm, int ym, float a )
 	t.vertexUV((float)width, 0, 0, width / s, 0);
 	t.vertexUV(0, 0, 0, 0, 0);
 	t.draw();
+
+	if (savingWorld) {
+		glEnable2(GL_BLEND);
+		drawCenteredString(minecraft->font, "Saving world...", width / 2,
+			height / 2 - 4, 0xffffff);
+		glDisable2(GL_BLEND);
+		sleepMs(50);
+		return;
+	}
 
 	int i = minecraft->progressStagePercentage;
 
@@ -92,6 +102,9 @@ void ProgressScreen::render( int xm, int ym, float a )
 bool ProgressScreen::isInGameScreen() { return false; }
 
 void ProgressScreen::tick() {
+	if (savingWorld)
+		return;
+
 	// After 10 seconds of not connecting -> write an error message and go back
 	if (++ticks == 10 * SharedConstants::TicksPerSecond && minecraft->getProgressStatusId() == 0) {
 		minecraft->setScreen( new DisconnectionScreen("Could not connect to server. Try again.") );

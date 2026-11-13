@@ -91,6 +91,7 @@ public:
 
 	virtual void tick();
 	virtual void render(int xm, int ym, float a);
+	virtual void mouseScrolled(int x, int y, int delta);
 
 	virtual bool isIndexValid(int index);
 	virtual bool handleBackEvent(bool isDown);

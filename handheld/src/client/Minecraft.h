@@ -57,6 +57,12 @@ public:
 	void init();
 	void setSize(int width, int height);
 	void reloadOptions();
+	void requestOptionsReset() { _optionsResetRequested = true; }
+	bool consumeOptionsResetRequest() {
+		const bool requested = _optionsResetRequested;
+		_optionsResetRequested = false;
+		return requested;
+	}
 
 	bool supportNonTouchScreen();
 	bool useTouchscreen();
@@ -69,6 +75,10 @@ public:
 	bool isCreativeMode();
 	void setIsCreativeMode(bool isCreative);
 	void setScreen(Screen*);
+	// Set when the selected Infinite/Sky world is rejected by the storage
+	// marker check.  UI callers use this to avoid replacing the error screen
+	// with the normal level-generation screen.
+	bool legacyStorageRejected() const { return _legacyStorageRejected; }
 
 	virtual void selectLevel(const std::string& levelId, const std::string& levelName, const LevelSettings& settings);
 	virtual void setLevel(Level* level, const std::string& message = "", LocalPlayer* forceInsertPlayer = NULL);
@@ -207,6 +217,11 @@ protected:
 
 	LevelStorageSource* storageSource;
 	bool _running;
+	bool _legacyStorageRejected;
+	bool _optionsResetRequested;
+	bool _pendingLeaveGame;
+	bool _pendingLeaveGameRename;
+	bool _processingDeferredLeaveGame;
 	bool _powerVr;
 
 private:
@@ -223,6 +238,9 @@ private:
 	bool _supportsNonTouchscreen;
 
 	bool _isCreativeMode;
+	bool _lightPriorityChunkValid;
+	int _lightPriorityChunkX;
+	int _lightPriorityChunkZ;
 	//int _respawnPlayerTicks;
 	Player* _pendingRemovePlayer; // @attn @todo @fix: remove this shait and fix the respawn behaviour
 

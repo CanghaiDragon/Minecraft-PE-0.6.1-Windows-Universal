@@ -304,6 +304,55 @@ void ChestScreen::buttonClicked(Button* button) {
 	}
 }
 
+void ChestScreen::mouseClicked(int x, int y, int buttonNum)
+{
+	super::mouseClicked(x, y, buttonNum);
+	if (inventoryPane)
+		inventoryPane->mouseClicked((float)x, (float)y, buttonNum);
+	if (chestPane)
+		chestPane->mouseClicked((float)x, (float)y, buttonNum);
+}
+
+void ChestScreen::mouseMoved(int x, int y)
+{
+	if (inventoryPane)
+		inventoryPane->mouseMoved((float)x, (float)y);
+	if (chestPane)
+		chestPane->mouseMoved((float)x, (float)y);
+}
+
+void ChestScreen::mouseReleased(int x, int y, int buttonNum)
+{
+	if (inventoryPane)
+		inventoryPane->mouseReleased((float)x, (float)y, buttonNum);
+	if (chestPane)
+		chestPane->mouseReleased((float)x, (float)y, buttonNum);
+	super::mouseReleased(x, y, buttonNum);
+}
+
+void ChestScreen::mouseScrolled(int x, int y, int delta)
+{
+	if (delta == 0)
+		return;
+
+	// The two panes occupy separate halves of the container screen.  Only
+	// scroll the pane beneath the pointer.
+	if (inventoryPane) {
+		const IntRectangle& rect = inventoryPane->rect;
+		if (x >= rect.x && x < rect.x + rect.w &&
+			y >= rect.y && y < rect.y + rect.h) {
+			inventoryPane->mouseScrolled(delta);
+			return;
+		}
+	}
+	if (chestPane) {
+		const IntRectangle& rect = chestPane->rect;
+		if (x >= rect.x && x < rect.x + rect.w &&
+			y >= rect.y && y < rect.y + rect.h)
+			chestPane->mouseScrolled(delta);
+	}
+}
+
 bool ChestScreen::handleAddItem(FillingContainer* from, FillingContainer* to, int itemIndex) {
 	const int itemOffset = from->getNumLinkedSlots();
 	const int slotIndex = itemIndex + itemOffset;
@@ -383,6 +432,27 @@ bool ChestScreen::addItem(const Touch::InventoryPane* forPane, int itemIndex) {
 	return handleAddItem(	l2r? upcast<FillingContainer>(minecraft->player->inventory) : upcast<FillingContainer>(chest),
 							l2r? upcast<FillingContainer>(chest) : upcast<FillingContainer>(minecraft->player->inventory),
 							itemIndex);
+}
+
+bool ChestScreen::quickMoveItem(const Touch::InventoryPane* forPane, int itemIndex) {
+	// Reuse the normal transfer path, but make the requested amount the whole
+	// stack instead of the one-item/hold percentage used by touch input.
+	const int oldHeldMs = heldMs;
+	const int oldPercent = percent;
+	heldMs = (int)MaxHoldMs;
+	percent = 100;
+
+	const bool inventoryToChest = (forPane == inventoryPane);
+	const bool moved = handleAddItem(
+		inventoryToChest ? upcast<FillingContainer>(minecraft->player->inventory)
+		                : upcast<FillingContainer>(chest),
+		inventoryToChest ? upcast<FillingContainer>(chest)
+		                : upcast<FillingContainer>(minecraft->player->inventory),
+		itemIndex);
+
+	heldMs = oldHeldMs;
+	percent = oldPercent;
+	return moved;
 }
 
 bool ChestScreen::isAllowed( int slot )

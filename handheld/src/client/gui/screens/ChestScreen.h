@@ -31,9 +31,14 @@ public:
 	void render(int xm, int ym, float a);
 	bool renderGameBehind();
 	void buttonClicked(Button* button);
+	void mouseClicked(int x, int y, int buttonNum);
+	void mouseMoved(int x, int y);
+	void mouseReleased(int x, int y, int buttonNum);
+	void mouseScrolled(int x, int y, int delta);
 
 	// IInventoryPaneCallback
 	bool addItem(const Touch::InventoryPane* pane, int itemId);
+	bool quickMoveItem(const Touch::InventoryPane* pane, int itemId);
 	bool isAllowed( int slot );
 	std::vector<const ItemInstance*> getItems( const Touch::InventoryPane* forPane );
 	//const ItemList& getItems(const ItemPane* forPane);

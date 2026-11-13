@@ -138,7 +138,10 @@ public:
     void updateLightIfOtherThan(const LightLayer& layer, int x, int y, int z, int expected);
 
 	int getLightsToUpdate();
+	void forceLightUpdatesAround(int chunkX, int chunkZ);
 	bool updateLights();
+	void setLightUpdateBudget(int budget);
+	void setLightUpdateTimeBudget(float seconds);
 	void setUpdateLights(bool doUpdate);
 	void updateLight(const LightLayer& layer, int x0, int y0, int z0, int x1, int y1, int z1);
 	void updateLight(const LightLayer& layer, int x0, int y0, int z0, int x1, int y1, int z1, bool join);
@@ -146,7 +149,7 @@ public:
     //HitResult clip(const Vec3& a, const Vec3& b);
     HitResult clip(const Vec3& a, const Vec3& b, bool liquid = false, bool solidOnly = false);
 
-    bool addEntity(Entity* e);
+    bool addEntity(Entity* e, bool markChunkUnsaved = true);
     void removeEntity(Entity* e);
 	void removePlayer( Player* player );
     //void removeEntityImmediately(Entity* e);
@@ -333,6 +336,8 @@ private:
 	LightUpdateList _lightUpdates;
 	EntityMap _pendingEntityData;
 	bool _updateLights;
+	int _lightUpdateBudget;
+	float _lightUpdateTimeBudget;
 
 	int  _maxRecurse;
 	bool _isNew;

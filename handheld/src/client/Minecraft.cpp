@@ -39,7 +39,10 @@ extern void setWin32GuiInputEnabled(bool enabled);
 #include "particle/ParticleEngine.h"
 #include "gui/Screen.h"
 #include "gui/Font.h"
+#include "gui/components/Button.h"
+#include "../platform/input/Keyboard.h"
 #include "gui/screens/RenameMPLevelScreen.h"
+#include "gui/screens/ProgressScreen.h"
 #include "sound/SoundEngine.h"
 #endif
 #include "../platform/CThread.h"
@@ -113,6 +116,92 @@ extern void setWin32GuiInputEnabled(bool enabled);
 #include "sound/SoundEngine.h"
 #endif
 
+#include <exception>
+
+#ifndef STANDALONE_SERVER
+class LegacyWorldFormatScreen final : public Screen
+{
+	typedef Screen super;
+
+public:
+	LegacyWorldFormatScreen()
+		: backButton(NULL)
+	{
+	}
+
+	~LegacyWorldFormatScreen() override
+	{
+		delete backButton;
+	}
+
+	void init() override
+	{
+		// Select the native button artwork from the independent UI mode.
+		if (minecraft->options.javaUi)
+			backButton = new Button(1, "Back");
+		else
+			backButton = new Touch::TButton(1, "Back");
+
+		backButton->width = 128;
+		backButton->height = 24;
+		buttons.push_back(backButton);
+		tabButtons.push_back(backButton);
+	}
+
+	void setupPositions() override
+	{
+		backButton->x = (width - backButton->width) / 2;
+		backButton->y = height / 2 + 24;
+	}
+
+	void render(int xm, int ym, float a) override
+	{
+		// This screen is shown before a Level is attached.  Use the native dirt
+		// background and MC font, as the UWP error screen does.
+		renderDirtBackground(0);
+		drawCenteredString(font,
+			"This world is in an unsupported legacy format.",
+			width / 2, height / 2 - 42, 0xffffff);
+		drawCenteredString(font,
+			"Convert this world before opening it.",
+			width / 2, height / 2 - 26, 0xffffff);
+		super::render(xm, ym, a);
+	}
+
+	void buttonClicked(Button* button) override
+	{
+		if (button == backButton)
+			minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+	}
+
+	bool handleBackEvent(bool isDown) override
+	{
+		if (!isDown)
+			minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+		return true;
+	}
+
+	bool isInGameScreen() override
+	{
+		return false;
+	}
+
+protected:
+	void keyPressed(int eventKey) override
+	{
+		if (eventKey == Keyboard::KEY_ESCAPE)
+		{
+			minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+			return;
+		}
+		super::keyPressed(eventKey);
+	}
+
+private:
+	Button* backButton;
+};
+#endif
+
 static void checkGlError(const char* tag) {
 #ifdef GLDEBUG
 	while (1) {
@@ -163,6 +252,11 @@ Minecraft::Minecraft()
 	missTime(0),
 	pause(false),
 	_running(false),
+	_legacyStorageRejected(false),
+	_optionsResetRequested(false),
+	_pendingLeaveGame(false),
+	_pendingLeaveGameRename(false),
+	_processingDeferredLeaveGame(false),
 	timer(20),
 #ifndef STANDALONE_SERVER
 	gui(this),
@@ -197,6 +291,9 @@ Minecraft::Minecraft()
     _isSuperFast(false),
 #endif
 	_powerVr(false),
+	_lightPriorityChunkValid(false),
+	_lightPriorityChunkX(0),
+	_lightPriorityChunkZ(0),
 	commandPort(4711),
 	reserved_d1(0),reserved_d2(0),
 	reserved_f1(0),reserved_f2(0)
@@ -285,24 +382,47 @@ Minecraft::~Minecraft()
 // Only called by server
 void Minecraft::selectLevel( const std::string& levelId, const std::string& levelName, const LevelSettings& settings )
 {
-#if defined(CREATORMODE)
-	level = new CreatorLevel(
-#else
-	level = new ServerLevel(
-#endif
-		storageSource->selectLevel(levelId, false),
-		levelName,
-		settings,
-		SharedConstants::GeneratorVersion);
+	_legacyStorageRejected = false;
+	_lightPriorityChunkValid = false;
 
-	// note: settings is useless beyond this point, since it's
-	//       either copied to LevelData (or LevelData read from file)
-	setLevel(level, "Generating level");
-	setIsCreativeMode(level->getLevelData()->getGameType() == GameType::Creative);
-	_running = true;
+	try
+	{
+#if defined(CREATORMODE)
+		level = new CreatorLevel(
+#else
+		level = new ServerLevel(
+#endif
+			storageSource->selectLevel(levelId, false),
+			levelName,
+			settings,
+			SharedConstants::GeneratorVersion);
+
+		// note: settings is useless beyond this point, since it's
+		//       either copied to LevelData (or LevelData read from file)
+		setLevel(level, "Generating level");
+		setIsCreativeMode(level->getLevelData()->getGameType() == GameType::Creative);
+		_running = true;
+	}
+	catch (const std::exception& error)
+	{
+		if (std::string(error.what()) != "MCPEUWP_LEGACY_INFINITE_STORAGE")
+			throw;
+
+		LOGE("Refusing legacy Infinite/Sky world: %s\n", error.what());
+		_legacyStorageRejected = true;
+		level = NULL;
+		isGeneratingLevel = false;
+		_running = false;
+#ifndef STANDALONE_SERVER
+		Keyboard::reset();
+		setScreen(new LegacyWorldFormatScreen());
+#endif
+	}
 }
 
 void Minecraft::setLevel(Level* level, const std::string& message /* ="" */, LocalPlayer* forceInsertPlayer /* = NULL */) {
+	if (level != NULL)
+		_lightPriorityChunkValid = false;
 	cameraTargetPlayer = NULL;
 	LOGI("Seed is %ld\n", level->getSeed());
 
@@ -355,6 +475,17 @@ void Minecraft::leaveGame(bool renameLevel /*=false*/)
     if (!_running || level == NULL || isGeneratingLevel || !_hasSignaledGeneratingLevelFinished)
         return;
 
+#ifndef STANDALONE_SERVER
+	if (!_processingDeferredLeaveGame) {
+		if (_pendingLeaveGame)
+			return;
+		_pendingLeaveGame = true;
+		_pendingLeaveGameRename = renameLevel;
+		setScreen(new ProgressScreen(true));
+		return;
+	}
+#endif
+
 	LOGI("leaveGame: begin rename=%d\n", renameLevel ? 1 : 0);
 	isGeneratingLevel = false;
 	bool saveLevel = level && (!level->isClientSide || renameLevel);
@@ -390,6 +521,7 @@ void Minecraft::leaveGame(bool renameLevel /*=false*/)
 	//delete player;
 	player = NULL;
 	cameraTargetPlayer = NULL;
+	_lightPriorityChunkValid = false;
 
 	_running = false;
 	LOGI("leaveGame: cleanup complete\n");
@@ -487,6 +619,20 @@ void Minecraft::prepareLevel(const std::string& title) {
 void Minecraft::update() {
 	//LOGI("Enter Update\n");
 
+#ifndef STANDALONE_SERVER
+	// Match the UWP save transition: let one complete frame present the
+	// Saving world screen before the synchronous chunk flush begins.
+	if (_pendingLeaveGame) {
+		const bool renameLevel = _pendingLeaveGameRename;
+		_pendingLeaveGame = false;
+		_pendingLeaveGameRename = false;
+		_processingDeferredLeaveGame = true;
+		leaveGame(renameLevel);
+		_processingDeferredLeaveGame = false;
+		return;
+	}
+#endif
+
 	if (Options::debugGl)
 		LOGI(">>>>>>>>>>\n");
 
@@ -526,8 +672,27 @@ void Minecraft::update() {
 			break;
 	}
 
+	if (level != NULL && player != NULL && !isGeneratingLevel)
+	{
+		const int playerChunkX = Mth::floor(player->x / CHUNK_WIDTH);
+		const int playerChunkZ = Mth::floor(player->z / CHUNK_WIDTH);
+		if (!_lightPriorityChunkValid ||
+			playerChunkX != _lightPriorityChunkX ||
+			playerChunkZ != _lightPriorityChunkZ)
+		{
+			// Requeue the player's 3x3 area when entering a new chunk. This
+			// repairs local lighting misses without clearing distant work.
+			level->forceLightUpdatesAround(playerChunkX, playerChunkZ);
+			_lightPriorityChunkX = playerChunkX;
+			_lightPriorityChunkZ = playerChunkZ;
+			_lightPriorityChunkValid = true;
+		}
+	}
+
 	TIMER_POP_PUSH("updatelights");
 	if (level && !isGeneratingLevel) {
+		level->setLightUpdateBudget(options.getLightUpdateBudget());
+		level->setLightUpdateTimeBudget(options.getLightUpdateTimeBudget());
 		level->updateLights();
 	}
 	TIMER_POP();
@@ -625,6 +790,8 @@ void Minecraft::tick(int nTick, int maxTick) {
 			if (level->isClientSide) level->difficulty = Difficulty::EASY;
 
 			TIMER_POP_PUSH("level");
+			if (level->isInfinite() && level->getLevelStorage() != NULL)
+				level->getLevelStorage()->loadDeferredEntities(level, 16);
 			level->tickEntities();
 			level->tick();
 #ifndef STANDALONE_SERVER
@@ -804,7 +971,7 @@ void Minecraft::tickInput() {
 				}
 
 				if (key == Keyboard::KEY_F5) {
-					options.thirdPersonView = !options.thirdPersonView;
+					options.cycleThirdPersonView();
 				}
 
 				// Keep the old no-physics flight shortcut available only in
@@ -1734,11 +1901,19 @@ ICreator* Minecraft::getCreator()
 }
 
 void Minecraft::optionUpdated( const Options::Option* option, bool value ) {
-	if (option == &Options::Option::BETA_VISUALS && levelRenderer != NULL) {
+	if ((option == &Options::Option::BETA_VISUALS || option == &Options::Option::GRAPHICS) && levelRenderer != NULL) {
 		// Grass and leaf tint is baked into chunk meshes, so switching the
 		// presentation mode must invalidate them immediately.
 		levelRenderer->allChanged();
 	}
+	#ifndef STANDALONE_SERVER
+	if (option == &Options::Option::JAVA_UI) {
+		// Java/PE presentation affects both the hotbar and screen layout.  Reuse
+		// the normal resize path so the change is visible without leaving the
+		// options screen or resizing the window manually.
+		setSize(width, height);
+	}
+	#endif
 	if(netCallback != NULL && option == &Options::Option::SERVER_VISIBLE) {
 		ServerSideNetworkHandler* ss = (ServerSideNetworkHandler*) netCallback;
 		ss->allowIncomingConnections(value);

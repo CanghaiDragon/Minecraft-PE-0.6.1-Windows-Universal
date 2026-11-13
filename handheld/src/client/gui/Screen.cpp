@@ -77,6 +77,10 @@ void Screen::mouseEvent()
 	const MouseAction& e = Mouse::getEvent();
 	int xm = e.x * width / minecraft->width;
 	int ym = e.y * height / minecraft->height - 1;
+	if (e.action == MouseAction::ACTION_MOVE) {
+		mouseMoved(xm, ym);
+		return;
+	}
 	if (e.action == MouseAction::ACTION_WHEEL) {
 		mouseScrolled(xm, ym, e.dy);
 		return;

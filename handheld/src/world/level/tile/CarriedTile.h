@@ -20,6 +20,11 @@ public:
     }
 
     int getTexture(int face, int data) {
+        if (Tile::useAlphaTextures() && this == Tile::grass_carried) {
+            if (face == 1) return Tile::ALPHA_GRASS_TOP_TEXTURE;
+            if (face == 0) return Tile::ALPHA_GRASS_BOTTOM_TEXTURE;
+            return Tile::ALPHA_GRASS_SIDE_TEXTURE;
+        }
         if (face == 1) return texTop;
         return texDefault;
     }

@@ -4,6 +4,7 @@
 //#include "../levelgen/SimpleLevelSource.h"
 #include "../levelgen/RandomLevelSource.h"
 #include "../levelgen/SkyLevelSource.h"
+#include "../levelgen/AlphaLevelSource.h"
 #include "../Level.h"
 #include "../biome/BiomeSource.h"
 #include "../biome/FixedBiomeSource.h"
@@ -68,13 +69,19 @@ void Dimension::init()
 {
 	if (level->getLevelData()->getWorldType() == WorldType::Sky)
 		biomeSource = new FixedBiomeSource(Biome::sky, 0.5f, 0.0f);
+	else if (level->getLevelData()->getWorldType() == WorldType::Alpha) {
+		const bool winter = WorldType::isAlphaWinter(level->getSeed());
+		biomeSource = new FixedBiomeSource(
+			winter ? Biome::winter : Biome::alpha, 0.84f, 0.70f);
+	}
 	else
 		biomeSource = new BiomeSource(level);
 }
 
 /*virtual*/
 bool Dimension::isValidSpawn(int x, int z) {
-    if (level->getLevelData()->getWorldType() == WorldType::Sky) {
+	if (level->getLevelData()->getWorldType() == WorldType::Sky ||
+		level->getLevelData()->getWorldType() == WorldType::Alpha) {
         int y = level->getTopTileY(x, z);
         if (y < 0 || y > Level::DEPTH - 3) return false;
         int tile = level->getTile(x, y, z);
@@ -105,6 +112,9 @@ float Dimension::getTimeOfDay(long time, float a) {
 }
 
 ChunkSource* Dimension::createRandomLevelSource() {
+	if (level->getLevelData()->getWorldType() == WorldType::Alpha)
+		return new AlphaLevelSource(level, level->getSeed(),
+			!level->isClientSide && level->getLevelData()->getSpawnMobs());
 	if (level->getLevelData()->getWorldType() == WorldType::Sky)
 		return new SkyLevelSource(level, level->getSeed(),
 			!level->isClientSide && level->getLevelData()->getSpawnMobs());

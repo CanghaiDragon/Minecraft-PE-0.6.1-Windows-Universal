@@ -23,7 +23,9 @@ DeathScreen::~DeathScreen()
 
 void DeathScreen::init()
 {
-	if (minecraft->useTouchscreen()) {
+	// Death-screen buttons belong to the selected UI family.  Do not let a
+	// touch-capable desktop silently switch this screen to PE artwork.
+	if (!minecraft->options.javaUi) {
 		bRespawn = new Touch::TButton(1, "Respawn!");
 		bTitle = new Touch::TButton(2, "Main menu");
 	} else {

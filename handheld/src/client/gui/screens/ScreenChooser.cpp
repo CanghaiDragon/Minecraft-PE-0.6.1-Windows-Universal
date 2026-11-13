@@ -15,15 +15,10 @@
 Screen* ScreenChooser::createScreen( ScreenId id )
 {
 	Screen* screen = NULL;
+	const bool useJavaUi = _mc->options.javaUi;
 
-// macOS/Linux retain their touch-style menus.  Windows deliberately follows
-// the user-selected Input Mode, so its keyboard/mouse title screen can use
-// the same normal Button UI as the in-game pause menu.
-#if defined(MACOS) || defined(LINUX)
-	if (true) {
-#else
-	if (_mc->useTouchscreen()) {
-#endif
+	// Menu presentation is independent of the in-world input mode.
+	if (!useJavaUi) {
 		switch (id) {
 		case SCREEN_STARTMENU:	screen = new Touch::StartMenuScreen();	break;
 		case SCREEN_SELECTWORLD:screen = new Touch::SelectWorldScreen();break;

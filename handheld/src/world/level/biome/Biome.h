@@ -26,6 +26,8 @@ public:
     static Biome* iceDesert;
     static Biome* tundra;
     static Biome* sky;
+	static Biome* alpha;
+	static Biome* winter;
 
     class MobSpawnerData: public WeighedRandom::WeighedRandomItem
 	{
@@ -52,6 +54,7 @@ protected:
 
 	Biome* setName(const std::string& name);
 	Biome* setLeafColor(int leafColor);
+	Biome* setGrassColor(int grassColor);
 	Biome* setColor(int color);
 	Biome* setSnowCovered();
 	Biome* clearMobs(bool friendlies = true, bool waterFriendlies = true, bool enemies = true);
@@ -83,12 +86,15 @@ public:
 
 	virtual MobList& getMobs(const MobCategory& category);
 	virtual float getCreatureProbability();
+	bool isSnowCovered() const;
 
 	std::string name;
 	int color;
+	int grassColor;
 	char topMaterial;
 	char material;
 	int leafColor;
+	bool snowCovered;
 private:
 	static Biome* map[64*64];
 };

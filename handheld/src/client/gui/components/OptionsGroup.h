@@ -21,6 +21,7 @@ public:
 	TextBox* addTextInput(const std::string& label, const std::string& hint, const std::string& value);
 	OptionsGroup& addDisabledItem(const std::string& label, const std::string& value);
 	OptionsGroup& addDescription(const std::string& text);
+	OptionsGroup& addRestoreDefaultsItem(Minecraft* minecraft);
 	OptionsGroup& addClearSkinCacheItem(Minecraft* minecraft);
 	OptionsGroup& addImportSkinItem(Minecraft* minecraft);
 protected:

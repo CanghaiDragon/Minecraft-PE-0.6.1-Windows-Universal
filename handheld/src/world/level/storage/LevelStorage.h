@@ -31,6 +31,7 @@ public:
 
 	virtual void saveGame(Level* level) {}
 	virtual void loadEntities(Level* level, LevelChunk* levelChunk) {}
+	virtual bool loadDeferredEntities(Level* level, int maxEntities) { return true; }
 	virtual void finishPreload() {}
 
 	//void checkSession() throws LevelConflictException;

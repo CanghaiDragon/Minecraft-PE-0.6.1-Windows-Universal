@@ -31,7 +31,9 @@ ConfirmScreen::~ConfirmScreen() {
 
 void ConfirmScreen::init()
 {
-	if (minecraft->useTouchscreen()) {
+	// Button presentation follows the selected UI family, not whether the
+	// current device/input path happens to expose a touchscreen.
+	if (!minecraft->options.javaUi) {
 		yesButton = new Touch::TButton(0, 0, 0, yesButtonText),
 		noButton  = new Touch::TButton(1, 0, 0, noButtonText);
 	} else {

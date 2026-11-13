@@ -185,7 +185,13 @@ void TileEntity::setLevelAndPos( Level* level, int x, int y, int z ) {
 	this->y = y;
 	this->z = z;
 
-	if (level) {
+	// During infinite-world chunk loading, the chunk is attached to the
+	// ChunkCache only after ExternalFileLevelStorage::load() returns.  Calling
+	// Level::getTile() here would try to load the same chunk recursively and
+	// eventually overflow the stack.  The tile cache is only needed once the
+	// chunk is already resident.
+	this->tile = NULL;
+	if (level && (!level->isInfinite() || level->hasChunk(x >> 4, z >> 4))) {
 		this->tile = Tile::tiles[level->getTile(x, y, z)];
 	}
 }

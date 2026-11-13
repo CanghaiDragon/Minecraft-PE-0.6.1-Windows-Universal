@@ -45,9 +45,20 @@ StartMenuScreen::StartMenuScreen()
 	bJoin(    3, 0, 0, 200, 22, "Multiplayer"),
 	bOptions( 4, 0, 0,  98, 22, "Options..."),
 	bQuit(    6, 0, 0,  98, 22, "Quit Game"),
+	bSkin(    8, ""),
 	bBuy(     5, 0, 0, 78, 22, "Buy"),
 	bTest(    999, 0, 0, 78, 22, "Create")
 {
+	ImageDef skinImage;
+	skinImage.name = "gui/gui.png";
+	skinImage.width = 20;
+	skinImage.height = 20;
+	skinImage.setSrc(IntRectangle(236, 66, 20, 20));
+	skinImage.setSecondImageVertical(true);
+	skinImage.setSecondImageStep(0, 20);
+	bSkin.setImageDef(skinImage, true);
+	bSkin.scaleWhenPressed = false;
+	bSkin.active = true;
 }
 
 StartMenuScreen::~StartMenuScreen()
@@ -68,6 +79,10 @@ void StartMenuScreen::init()
 		tabButtons.push_back(&bOptions);
 		buttons.push_back(&bQuit);
 		tabButtons.push_back(&bQuit);
+		if (minecraft->options.skinMenu) {
+			buttons.push_back(&bSkin);
+			tabButtons.push_back(&bSkin);
+		}
 	#endif
 
 	#ifdef DEMO_MODE
@@ -78,7 +93,7 @@ void StartMenuScreen::init()
 	copyright = "\xffMojang AB";//. Do not distribute!";
 	githubUrl = "https://github.com/CanghaiDragon/Minecraft-PE-0.6.1-Windows-Universal/tree/master";
 	githubLabel = "Visit Github Repository";
-	buildInfo = std::string("Windows Universal v1.0 build ") + getBuildArchitecture();
+	buildInfo = std::string("Windows Universal v1.1 build ") + getBuildArchitecture();
 
 	#ifdef PRE_ANDROID23
 		std::string versionString = Common::getGameVersionString("j");
@@ -128,6 +143,13 @@ void StartMenuScreen::setupPositions() {
 	bJoin.x = (width - bJoin.width) / 2;
 	bOptions.x = width / 2 - bOptions.width - 3;
 	bQuit.x = width / 2 + 3;
+	if (minecraft->options.skinMenu) {
+		const int skinButtonSize = bQuit.height > 2 ? bQuit.height - 2 : 1;
+		bSkin.width = skinButtonSize;
+		bSkin.height = skinButtonSize;
+		bSkin.x = bQuit.x + bQuit.width + 4;
+		bSkin.y = bQuit.y + (bQuit.height - bSkin.height) / 2;
+	}
 	bTest.x = bBuy.x = bOptions.x + bOptions.width + 4;
 
 	copyrightPosX = width - minecraft->font->width(copyright) - 1;
@@ -156,6 +178,10 @@ void StartMenuScreen::buttonClicked(Button* button) {
 	if (button->id == bOptions.id)
 	{
 		minecraft->setScreen(new OptionsScreen());
+	}
+	if (button->id == bSkin.id)
+	{
+		minecraft->setScreen(new OptionsScreen(true));
 	}
 	if (button->id == bQuit.id)
 	{

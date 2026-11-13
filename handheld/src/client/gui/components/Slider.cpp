@@ -60,6 +60,12 @@ static std::string sliderValueText(SliderType sliderType, const Options::Option*
 		} else if (option == &Options::Option::DPAD_SIZE) {
 			int idx = Mth::clamp(curStepValue, 0, 2);
 			return I18n::get(Options::DPAD_SIZE[idx]);
+		} else if (option == &Options::Option::THIRD_PERSON) {
+			if (curStepValue == Options::THIRD_PERSON_FRONT)
+				return I18n::get("options.thirdperson.front");
+			if (curStepValue == Options::THIRD_PERSON_BACK)
+				return I18n::get("options.thirdperson.back");
+			return I18n::get("options.thirdperson.first");
 		} else if (option == &Options::Option::INPUT_MODE) {
 			// The surrounding row is already labelled "Input Mode".  A compact
 			// desktop label keeps this value inside the option pane at every GUI
@@ -79,7 +85,8 @@ static std::string sliderValueText(SliderType sliderType, const Options::Option*
 
 void Slider::render( Minecraft* minecraft, int xm, int ym ) {
 	// Reserve right portion for value text (~32px)
-	const int textAreaW = (option == &Options::Option::INPUT_MODE || option == &Options::Option::SKIN_ARM_TYPE) ? 56 : 32;
+	const int textAreaW = (option == &Options::Option::INPUT_MODE || option == &Options::Option::SKIN_ARM_TYPE) ? 56 :
+		(option == &Options::Option::THIRD_PERSON ? 150 : 32);
 	int xSliderStart = x + 5;
 	int xSliderEnd = x + width - 5 - textAreaW;
 	int barHeight = 4;
@@ -136,7 +143,8 @@ void Slider::tick(Minecraft* minecraft) {
 		minecraft->screen->toGUICoordinate(xm, ym);
 		if(mouseDownOnElement) {
 			const int xSliderStart = x + 5;
-			const int textAreaW = (option == &Options::Option::INPUT_MODE || option == &Options::Option::SKIN_ARM_TYPE) ? 56 : 32;
+			const int textAreaW = (option == &Options::Option::INPUT_MODE || option == &Options::Option::SKIN_ARM_TYPE) ? 56 :
+				(option == &Options::Option::THIRD_PERSON ? 150 : 32);
 			const int sliderWidth = width - 10 - textAreaW; // must match render()
 			if (sliderWidth <= 0) return;
 			percentage = float(xm - xSliderStart) / float(sliderWidth);

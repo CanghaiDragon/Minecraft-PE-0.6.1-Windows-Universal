@@ -1,8 +1,10 @@
 #include "OptionsScreen.h"
 
 #include "StartMenuScreen.h"
+#include "WelcomeScreen.h"
 #include "DialogDefinitions.h"
 #include "../../Minecraft.h"
+#include "../../User.h"
 #include "../../../AppPlatform.h"
 #include "../../../locale/I18n.h"
 
@@ -14,12 +16,14 @@
 #include "../../renderer/gles.h"
 #include "../../../platform/input/Mouse.h"
 #include "../../../util/Mth.h"
-OptionsScreen::OptionsScreen()
+OptionsScreen::OptionsScreen(bool skinOnly)
 : btnClose(NULL),
   bHeader(NULL),
   currentOptionPane(NULL),
   usernameBox(NULL),
   selectedCategory(0),
+  _resettingOptions(false),
+  _skinOnly(skinOnly),
   _catScrollY(0),
   _catScrollVelocity(0),
   _catContentHeight(0),
@@ -57,7 +61,7 @@ OptionsScreen::~OptionsScreen() {
 }
 
 void OptionsScreen::init() {
-	bHeader = new Touch::THeader(0, "Options");
+	bHeader = new Touch::THeader(0, _skinOnly ? I18n::get("options.category.skin") : "Options");
 	btnClose = new ImageButton(1, "");
 	ImageDef def;
 	def.name = "gui/touchgui.png";
@@ -67,15 +71,14 @@ void OptionsScreen::init() {
 	def.setSrc(IntRectangle(150, 0, (int)def.width, (int)def.height));
 	btnClose->setImageDef(def, true);
 
-	// Category order follows Options.md.  Audio sits directly above Additional.
-	Touch::TButton* b;
-	b = new Touch::TButton(2, I18n::get("options.category.game"));       b->width = 80; b->height = 28; categoryButtons.push_back(b);
-	b = new Touch::TButton(3, I18n::get("options.category.controls"));   b->width = 80; b->height = 28; categoryButtons.push_back(b);
-	b = new Touch::TButton(4, I18n::get("options.category.graphics"));   b->width = 80; b->height = 28; categoryButtons.push_back(b);
-	b = new Touch::TButton(5, I18n::get("options.category.audio"));      b->width = 80; b->height = 28; categoryButtons.push_back(b);
-	b = new Touch::TButton(6, I18n::get("options.category.additional")); b->width = 80; b->height = 28; categoryButtons.push_back(b);
-	if (minecraft->options.skinMenu) {
-		b = new Touch::TButton(7, I18n::get("options.category.skin"));       b->width = 80; b->height = 28; categoryButtons.push_back(b);
+	if (!_skinOnly) {
+		// Category order follows Options.md.  Audio sits directly above Additional.
+		Touch::TButton* b;
+		b = new Touch::TButton(2, I18n::get("options.category.game"));       b->width = 80; b->height = 28; categoryButtons.push_back(b);
+		b = new Touch::TButton(3, I18n::get("options.category.controls"));   b->width = 80; b->height = 28; categoryButtons.push_back(b);
+		b = new Touch::TButton(4, I18n::get("options.category.graphics"));   b->width = 80; b->height = 28; categoryButtons.push_back(b);
+		b = new Touch::TButton(5, I18n::get("options.category.audio"));      b->width = 80; b->height = 28; categoryButtons.push_back(b);
+		b = new Touch::TButton(6, I18n::get("options.category.additional")); b->width = 80; b->height = 28; categoryButtons.push_back(b);
 	}
 	buttons.push_back(bHeader);
 	buttons.push_back(btnClose);
@@ -84,6 +87,8 @@ void OptionsScreen::init() {
 		tabButtons.push_back(*it);
 	}
 	generateOptionScreens();
+	if (_skinOnly && optionPanes.size() > 5)
+		currentOptionPane = optionPanes[5];
 
 }
 void OptionsScreen::setupPositions() {
@@ -97,6 +102,17 @@ void OptionsScreen::setupPositions() {
 	bHeader->y = 0;
 	bHeader->width = width - btnClose->width;
 	bHeader->height = headerH;
+
+	if (_skinOnly) {
+		if (optionPanes.size() > 5) {
+			optionPanes[5]->x = 0;
+			optionPanes[5]->y = headerH + 2;
+			optionPanes[5]->width = width;
+			optionPanes[5]->setupPositions();
+			currentOptionPane = optionPanes[5];
+		}
+		return;
+	}
 
 	int curY = headerH + 2;
 	for(std::vector<Touch::TButton*>::iterator it = categoryButtons.begin(); it != categoryButtons.end(); ++it) {
@@ -113,7 +129,7 @@ void OptionsScreen::setupPositions() {
 		(*it)->width = width - catW - 2;
 		(*it)->setupPositions();
 	}
-	selectCategory(0);
+	selectCategory(selectedCategory);
 }
 
 void OptionsScreen::render( int xm, int ym, float a ) {
@@ -122,52 +138,56 @@ void OptionsScreen::render( int xm, int ym, float a ) {
 	int catW = (categoryButtons.size() > 0) ? categoryButtons[0]->width : 80;
 	int headerH = (bHeader != NULL) ? bHeader->height : 26;
 
-	// Sidebar background & border
-	fill(0, headerH, catW, height, 0x66000000);
-	fill(catW, headerH, catW + 1, height, 0x88888888);
+	if (!_skinOnly) {
+		// Sidebar background & border
+		fill(0, headerH, catW, height, 0x66000000);
+		fill(catW, headerH, catW + 1, height, 0x88888888);
+	}
 
 	// Render header and close button (unscissored)
 	if (bHeader != NULL) ((Button*)bHeader)->render(minecraft, xm, ym);
 	if (btnClose != NULL) ((Button*)btnClose)->render(minecraft, xm, ym);
 
-	// --- Scrollable sidebar category buttons ---
-	int sidebarTop = headerH + 2;
-	_catVisibleHeight = height - sidebarTop;
-	if (_catVisibleHeight < 1) _catVisibleHeight = 1;
-	int maxScroll = _catContentHeight - _catVisibleHeight;
-	if (maxScroll < 0) maxScroll = 0;
-	if (_catScrollY < 0) _catScrollY = 0;
-	if (_catScrollY > maxScroll) _catScrollY = (float)maxScroll;
+	if (!_skinOnly) {
+		// --- Scrollable sidebar category buttons ---
+		int sidebarTop = headerH + 2;
+		_catVisibleHeight = height - sidebarTop;
+		if (_catVisibleHeight < 1) _catVisibleHeight = 1;
+		int maxScroll = _catContentHeight - _catVisibleHeight;
+		if (maxScroll < 0) maxScroll = 0;
+		if (_catScrollY < 0) _catScrollY = 0;
+		if (_catScrollY > maxScroll) _catScrollY = (float)maxScroll;
 
-	float scale = Gui::GuiScale;
-	int physH = minecraft->height;
-	GLint sx = 0;
-	GLint sy = physH - (GLint)(scale * (sidebarTop + _catVisibleHeight));
-	GLsizei sw = (GLsizei)(scale * catW);
-	GLsizei sh = (GLsizei)(scale * _catVisibleHeight);
-	glEnable2(GL_SCISSOR_TEST);
-	glScissor(sx, sy, sw, sh);
+		float scale = Gui::GuiScale;
+		int physH = minecraft->height;
+		GLint sx = 0;
+		GLint sy = physH - (GLint)(scale * (sidebarTop + _catVisibleHeight));
+		GLsizei sw = (GLsizei)(scale * catW);
+		GLsizei sh = (GLsizei)(scale * _catVisibleHeight);
+		glEnable2(GL_SCISSOR_TEST);
+		glScissor(sx, sy, sw, sh);
 
-	glPushMatrix2();
-	glTranslatef2(0, -(int)_catScrollY, 0);
+		glPushMatrix2();
+		glTranslatef2(0, -(int)_catScrollY, 0);
 
-	// Render only category buttons inside scissor
-	for (size_t i = 0; i < categoryButtons.size(); ++i) {
-		categoryButtons[i]->render(minecraft, xm, ym);
+		// Render only category buttons inside scissor
+		for (size_t i = 0; i < categoryButtons.size(); ++i) {
+			categoryButtons[i]->render(minecraft, xm, ym);
+		}
+
+		glPopMatrix2();
+
+		// Sidebar scrollbar
+		if (maxScroll > 0) {
+			float barH = (float)_catVisibleHeight * _catVisibleHeight / _catContentHeight;
+			if (barH < 8) barH = 8;
+			float barY = sidebarTop + (_catScrollY / maxScroll) * (_catVisibleHeight - barH);
+			int barX = catW - 3;
+			fill(barX, (int)barY, barX + 2, (int)(barY + barH), 0x88ffffff);
+		}
+
+		glDisable2(GL_SCISSOR_TEST);
 	}
-
-	glPopMatrix2();
-
-	// Sidebar scrollbar
-	if (maxScroll > 0) {
-		float barH = (float)_catVisibleHeight * _catVisibleHeight / _catContentHeight;
-		if (barH < 8) barH = 8;
-		float barY = sidebarTop + (_catScrollY / maxScroll) * (_catVisibleHeight - barH);
-		int barX = catW - 3;
-		fill(barX, (int)barY, barX + 2, (int)(barY + barH), 0x88ffffff);
-	}
-
-	glDisable2(GL_SCISSOR_TEST);
 
 	// GameRenderer already gives Screen coordinates in GUI units.  Applying a
 	// second conversion here made option-row hover tests miss at non-1x GUI
@@ -178,7 +198,8 @@ void OptionsScreen::render( int xm, int ym, float a ) {
 
 void OptionsScreen::removed()
 {
-	saveUsername();
+	if (!_resettingOptions)
+		saveUsername();
 }
 
 void OptionsScreen::saveUsername()
@@ -193,7 +214,7 @@ void OptionsScreen::buttonClicked( Button* button ) {
 		saveUsername();
 		minecraft->reloadOptions();
 		minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
-	} else if(button->id > 1 && button->id < 8) {
+	} else if(!_skinOnly && button->id > 1 && button->id < 8) {
 		// This is a category button
 		int categoryButton = button->id - categoryButtons[0]->id;
 		selectCategory(categoryButton);
@@ -201,6 +222,9 @@ void OptionsScreen::buttonClicked( Button* button ) {
 }
 
 void OptionsScreen::selectCategory( int index ) {
+	if (index < 0 || index >= (int)categoryButtons.size() || index >= (int)optionPanes.size())
+		return;
+	selectedCategory = index;
 	int currentIndex = 0;
 	for(std::vector<Touch::TButton*>::iterator it = categoryButtons.begin(); it != categoryButtons.end(); ++it) {
 		if(index == currentIndex) {
@@ -210,8 +234,7 @@ void OptionsScreen::selectCategory( int index ) {
 		}
 		currentIndex++;
 	}
-	if(index < (int)optionPanes.size())
-		currentOptionPane = optionPanes[index];
+	currentOptionPane = optionPanes[index];
 }
 
 void OptionsScreen::generateOptionScreens() {
@@ -226,7 +249,8 @@ void OptionsScreen::generateOptionScreens() {
 	usernameBox = gameGroup.addTextInput("Username", "Username", minecraft->options.username);
 	gameGroup.addOptionItem(&Options::Option::DIFFICULTY, minecraft)
 		.addOptionItem(&Options::Option::THIRD_PERSON, minecraft)
-		.addOptionItem(&Options::Option::SERVER_VISIBLE, minecraft);
+		.addOptionItem(&Options::Option::SERVER_VISIBLE, minecraft)
+		.addRestoreDefaultsItem(minecraft);
 
 	// Controls
 	OptionsGroup& controlsGroup = optionPanes[1]->createOptionsGroup("options.group.controls");
@@ -236,8 +260,7 @@ void OptionsScreen::generateOptionScreens() {
 		.addOptionItem(&Options::Option::DPAD_SIZE, minecraft)
 		.addOptionItem(&Options::Option::LEFT_HANDED, minecraft)
 		.addOptionItem(&Options::Option::USE_TOUCH_JOYPAD, minecraft)
-		.addOptionItem(&Options::Option::INVERT_MOUSE, minecraft)
-		.addDisabledItem("Vibrate on Destroy", "Unavailable");
+		.addOptionItem(&Options::Option::INVERT_MOUSE, minecraft);
 
 	// Graphics
 	optionPanes[2]->createOptionsGroup("options.group.graphics")
@@ -257,6 +280,7 @@ void OptionsScreen::generateOptionScreens() {
 	// Additional: opt-in features and clearly marked future placeholders.
 	optionPanes[4]->createOptionsGroup("options.category.additional")
 		.addOptionItem(&Options::Option::INFINITE_WORLDS, minecraft)
+		.addOptionItem(&Options::Option::JAVA_UI, minecraft)
 		.addOptionItem(&Options::Option::SKIN_MENU, minecraft)
 		.addOptionItem(&Options::Option::TOUCH_SNEAK, minecraft)
 		.addOptionItem(&Options::Option::BETA_VISUALS, minecraft)
@@ -301,9 +325,28 @@ void OptionsScreen::generateOptionScreens() {
 }
 
 void OptionsScreen::mouseClicked( int x, int y, int buttonNum ) {
+	if (_skinOnly) {
+		if(currentOptionPane != NULL)
+			currentOptionPane->mouseClicked(minecraft, x, y, buttonNum);
+		super::mouseClicked(x, y, buttonNum);
+		return;
+	}
+
 	int catW = (categoryButtons.size() > 0) ? categoryButtons[0]->width : 80;
 	int headerH = (bHeader != NULL) ? bHeader->height : 26;
 	int sidebarTop = headerH + 2;
+
+	// Select the logical category before forwarding the click through the
+	// scrolled button list. This keeps category selection reliable after a
+	// resize or when the sidebar has been scrolled.
+	if (buttonNum == MouseAction::ACTION_LEFT && x >= 0 && x < catW && y >= sidebarTop) {
+		const int logicalY = y + (int)_catScrollY - sidebarTop;
+		const int rowH = categoryButtons.empty() ? 1 : categoryButtons[0]->height + 1;
+		const int category = logicalY / rowH;
+		if (logicalY >= 0 && category >= 0 && category < (int)categoryButtons.size() &&
+			logicalY % rowH < categoryButtons[category]->height)
+			selectCategory(category);
+	}
 
 	if (x >= 0 && x < catW && y >= sidebarTop) {
 		// Click in sidebar — start drag
@@ -322,6 +365,13 @@ void OptionsScreen::mouseClicked( int x, int y, int buttonNum ) {
 }
 
 void OptionsScreen::mouseReleased( int x, int y, int buttonNum ) {
+	if (_skinOnly) {
+		if(currentOptionPane != NULL)
+			currentOptionPane->mouseReleased(minecraft, x, y, buttonNum);
+		super::mouseReleased(x, y, buttonNum);
+		return;
+	}
+
 	int catW = (categoryButtons.size() > 0) ? categoryButtons[0]->width : 80;
 	int headerH = (bHeader != NULL) ? bHeader->height : 26;
 	int sidebarTop = headerH + 2;
@@ -339,6 +389,12 @@ void OptionsScreen::mouseReleased( int x, int y, int buttonNum ) {
 }
 
 void OptionsScreen::mouseScrolled(int x, int y, int delta) {
+	if (_skinOnly) {
+		if(currentOptionPane != NULL)
+			currentOptionPane->mouseScrolled(delta);
+		return;
+	}
+
 	int catW = (categoryButtons.size() > 0) ? categoryButtons[0]->width : 80;
 	if (x < catW) {
 		int maxScroll = _catContentHeight - _catVisibleHeight;
@@ -366,6 +422,23 @@ void OptionsScreen::keyboardNewChar(char inputChar)
 }
 
 void OptionsScreen::tick() {
+	if (minecraft->consumeOptionsResetRequest()) {
+		// Reset before replacing this screen. OptionsScreen::removed() normally
+		// saves the username text box, so suppress that cleanup for this path.
+		_resettingOptions = true;
+		const bool inputModeChanged = minecraft->options.useTouchScreen;
+		minecraft->options.initDefaultValues(Options::DefaultProfile::DesktopDefault);
+		minecraft->options.deleteSavedOptions();
+		minecraft->options.syncAmbientOcclusion();
+		if (inputModeChanged)
+			minecraft->optionUpdated(&Options::Option::INPUT_MODE, 0);
+		if (minecraft->user)
+			minecraft->user->name = minecraft->options.username;
+		minecraft->setSize(minecraft->width, minecraft->height);
+		minecraft->setScreen(new WelcomeScreen());
+		return;
+	}
+
 	// Sidebar scroll handling
 	if (_catDragging) {
 		int mx = Mouse::getX();

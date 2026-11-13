@@ -20,6 +20,7 @@
 #include "../../../world/inventory/FurnaceMenu.h"
 #include "../../../network/packet/ContainerSetSlotPacket.h"
 #include "../../../network/RakNetInstance.h"
+#include "../../../platform/input/Keyboard.h"
 
 static int heldMs = -1;
 static int percent = -1;
@@ -279,6 +280,11 @@ void FurnaceScreen::buttonClicked(Button* button) {
 
 	if (slot >= FurnaceTileEntity::SLOT_INGREDIENT
 	 && slot <= FurnaceTileEntity::SLOT_RESULT) {
+		if (Keyboard::isKeyDown(Keyboard::KEY_LSHIFT)
+			&& quickMoveFurnaceSlot(slot)) {
+			return;
+		}
+
 		// Can't highlight the Result slot
 		int oldSlot = selectedSlot;
 		if (slot != FurnaceTileEntity::SLOT_RESULT)
@@ -287,6 +293,36 @@ void FurnaceScreen::buttonClicked(Button* button) {
 		if (oldSlot == selectedSlot)
 			takeAndClearSlot(slot);
 	}
+}
+
+void FurnaceScreen::mouseClicked(int x, int y, int buttonNum)
+{
+	// Furnace slots and the close button are regular Screen controls.  The
+	// inventory list is a ScrollingPane and needs explicit desktop forwarding.
+	super::mouseClicked(x, y, buttonNum);
+	if (inventoryPane)
+		inventoryPane->mouseClicked((float)x, (float)y, buttonNum);
+}
+
+void FurnaceScreen::mouseMoved(int x, int y)
+{
+	if (inventoryPane)
+		inventoryPane->mouseMoved((float)x, (float)y);
+}
+
+void FurnaceScreen::mouseReleased(int x, int y, int buttonNum)
+{
+	if (inventoryPane)
+		inventoryPane->mouseReleased((float)x, (float)y, buttonNum);
+	super::mouseReleased(x, y, buttonNum);
+}
+
+void FurnaceScreen::mouseScrolled(int x, int y, int delta)
+{
+	(void)x;
+	(void)y;
+	if (inventoryPane)
+		inventoryPane->mouseScrolled(delta);
 }
 
 static bool sortCanCraftPredicate(const CItem* a, const CItem* b) {
@@ -363,6 +399,63 @@ bool FurnaceScreen::addItem(const Touch::InventoryPane* forPane, int itemIndex) 
 	return true;
 }
 
+bool FurnaceScreen::quickMoveItem(const Touch::InventoryPane* forPane, int itemIndex) {
+	(void)forPane;
+	if (itemIndex < 0 || itemIndex >= (int)inventoryItems.size() ||
+		itemIndex >= (int)inventorySlots.size())
+		return false;
+
+	ItemInstance* source = player->inventory->getItem(inventorySlots[itemIndex]);
+	if (!source || source->isNull())
+		return false;
+
+	// Prefer the currently selected furnace input, then try the other input
+	// slot if this item belongs there instead.
+	int target = selectedSlot;
+	if (!canMoveToFurnaceSlot(target, source)) {
+		const int other = target == FurnaceTileEntity::SLOT_FUEL
+			? FurnaceTileEntity::SLOT_INGREDIENT
+			: FurnaceTileEntity::SLOT_FUEL;
+		if (!canMoveToFurnaceSlot(other, source))
+			return false;
+		target = other;
+	}
+
+	ItemInstance* destination = furnace->getItem(target);
+	int capacity = source->count;
+	if (destination && !destination->isNull()) {
+		if (!ItemInstance::isStackable(source, destination))
+			return false;
+		capacity = destination->getMaxStackSize() - destination->count;
+	} else {
+		capacity = Mth::Min(capacity, source->getMaxStackSize());
+	}
+	if (capacity <= 0)
+		return false;
+
+	const int movedCount = Mth::Min(source->count, capacity);
+	ItemInstance moved(*source);
+	moved.count = movedCount;
+	if (destination && !destination->isNull())
+		destination->count += movedCount;
+	else
+		furnace->setItem(target, &moved);
+
+	source->count -= movedCount;
+	if (source->count <= 0)
+		player->inventory->clearSlot(inventorySlots[itemIndex]);
+
+	if (minecraft->level->isClientSide) {
+		ItemInstance updated = furnace->getItem(target)
+			? *furnace->getItem(target) : ItemInstance();
+		ContainerSetSlotPacket p(menu->containerId, target, updated);
+		minecraft->raknetInstance->send(p);
+	}
+
+	doRecreatePane = true;
+	return true;
+}
+
 bool FurnaceScreen::isAllowed( int slot )
 {	//LOGI("items.size, index: %d, %d\n", inventoryItems.size(), slot);
 	if (slot >= (int)inventoryItems.size()) return false;
@@ -433,6 +526,16 @@ bool FurnaceScreen::canMoveToFurnace(int inventorySlot, const ItemInstance* item
 	if (ItemInstance::isStackable(item, jitem) && jitem->count < jitem->getMaxStackSize())
 		return true;
 
+	return false;
+}
+
+bool FurnaceScreen::canMoveToFurnaceSlot(int slot, const ItemInstance* item) {
+	if (!item || item->isNull())
+		return false;
+	if (slot == FurnaceTileEntity::SLOT_FUEL)
+		return FurnaceTileEntity::isFuel(*item);
+	if (slot == FurnaceTileEntity::SLOT_INGREDIENT)
+		return !FurnaceRecipes::getInstance()->getResult(item->id).isNull();
 	return false;
 }
 
@@ -522,6 +625,34 @@ void FurnaceScreen::takeAndClearSlot( int slot )
 
 	int newSize = minecraft->player->inventory->getNumEmptySlots();
 	setIfNotSet(doRecreatePane, newSize != oldSize);
+}
+
+bool FurnaceScreen::quickMoveFurnaceSlot(int slot)
+{
+	if (slot < FurnaceTileEntity::SLOT_INGREDIENT ||
+		slot > FurnaceTileEntity::SLOT_RESULT)
+		return false;
+
+	ItemInstance* source = furnace->getItem(slot);
+	if (!source || source->isNull())
+		return false;
+
+	// Keep any remainder in the furnace when the player inventory is full.
+	ItemInstance remaining(*source);
+	const int originalCount = remaining.count;
+	minecraft->player->inventory->add(&remaining);
+	const int movedCount = originalCount - remaining.count;
+	if (movedCount <= 0)
+		return false;
+
+	ItemInstance updated = remaining.count > 0 ? remaining : ItemInstance();
+	furnace->setItem(slot, &updated);
+	if (minecraft->level->isClientSide) {
+		ContainerSetSlotPacket p(menu->containerId, slot, updated);
+		minecraft->raknetInstance->send(p);
+	}
+	doRecreatePane = true;
+	return true;
 }
 
 bool FurnaceScreen::handleAddItem( int slot, const ItemInstance* item )

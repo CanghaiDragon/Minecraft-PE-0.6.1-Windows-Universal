@@ -14,10 +14,12 @@
 /*static*/
 bool Options::debugGl = false;
 
-void Options::initDefaultValues() {
+void Options::initDefaultValues(DefaultProfile profile) {
+	activeDefaultProfile = profile;
 	difficulty = Difficulty::NORMAL;
 	hideGui = false;
 	thirdPersonView = false;
+	thirdPersonViewMode = THIRD_PERSON_FIRST;
 	renderDebug = false;
 	debugScreenEnabled = false;
 	isFlying = false;
@@ -38,6 +40,7 @@ void Options::initDefaultValues() {
 	slimSkin = false;
 	skinMenu = false;
 	touchSneak = false;
+	javaUi = false;
 
 	music = 1;
 	sound = 1;
@@ -55,9 +58,9 @@ void Options::initDefaultValues() {
 	else
 		useTouchScreen = true;
 #ifdef WIN32
-	// Windows supports both systems.  Keep touch as the first-run default so
-	// existing touch-first installations retain their current behaviour.
-	useTouchScreen = true;
+	// Desktop Default starts with keyboard/mouse controls. The welcome page
+	// still lets the user choose touch controls before entering the menu.
+	useTouchScreen = false;
 #endif
 	pixelsPerMillimeter = minecraft->platform()->getPixelsPerMillimeter();
 	//useMouseForDigging = true;
@@ -152,6 +155,36 @@ void Options::initDefaultValues() {
 	keyJump.key  = Keyboard::KEY_SPACE;
 	keySneak.key = Keyboard::KEY_LSHIFT;
 #endif
+
+#if defined(WIN32)
+	dpadSize = 1;
+	destroyVibration = false;
+	viewDistance = 1;
+	ambientOcclusion = true;
+	serverVisible = false;
+	applyDefaultProfile(profile);
+#endif
+}
+
+void Options::applyDefaultProfile(DefaultProfile profile)
+{
+	activeDefaultProfile = profile;
+	switch (profile)
+	{
+	case DefaultProfile::DesktopDefault:
+		useTouchScreen = false;
+		ambientOcclusion = true;
+		destroyVibration = false;
+		break;
+
+	case DefaultProfile::DesktopLowPerformance:
+		applyDefaultProfile(DefaultProfile::DesktopDefault);
+		viewDistance = 2; // Short
+		ambientOcclusion = false;
+		fancyGraphics = false; // Fast
+		activeDefaultProfile = profile;
+		break;
+	}
 }
 
 const Options::Option
@@ -167,7 +200,7 @@ const Options::Option
 	Options::Option::GRAPHICS			 (9, "options.graphics",		false, false),
 	Options::Option::AMBIENT_OCCLUSION	 (10, "options.ao",		false, true),
 	Options::Option::GUI_SCALE			 (11, "options.guiScale",	false, false),
-	Options::Option::THIRD_PERSON		 (12, "options.thirdperson",	false, true),
+	Options::Option::THIRD_PERSON		 (12, "options.thirdperson",	false, false),
     Options::Option::HIDE_GUI			 (13, "options.hidegui",     false, true),
 	Options::Option::SERVER_VISIBLE		 (14, "options.servervisible", false, true),
 	Options::Option::LEFT_HANDED		 (15, "options.lefthanded", false, true),
@@ -182,6 +215,7 @@ const Options::Option
 	Options::Option::SKIN_MENU            (26, "options.skinMenu", false, true),
 	Options::Option::TOUCH_SNEAK          (27, "options.touchSneak", false, true),
 	Options::Option::DEBUG_SCREEN         (28, "options.debugScreen", false, true),
+	Options::Option::JAVA_UI              (29, "options.javaUi", false, true),
 	Options::Option::PIXELS_PER_MILLIMETER(19, "options.pixelspermilimeter", true, false),
 	Options::Option::FOV                  (20, "options.fov",               true, false);
 
@@ -240,9 +274,29 @@ void Options::setSettingsPath(const std::string& path) {
 	optionsFile.setSettingsPath(path);
 }
 
+void Options::setThirdPersonViewMode(int mode)
+{
+	if (mode < THIRD_PERSON_FIRST || mode > THIRD_PERSON_FRONT)
+		mode = THIRD_PERSON_FIRST;
+	thirdPersonViewMode = mode;
+	thirdPersonView = mode != THIRD_PERSON_FIRST;
+}
+
+void Options::setThirdPersonViewEnabled(bool enabled)
+{
+	setThirdPersonViewMode(enabled ? THIRD_PERSON_BACK : THIRD_PERSON_FIRST);
+}
+
+void Options::cycleThirdPersonView()
+{
+	setThirdPersonViewMode((thirdPersonViewMode + 1) % 3);
+	save();
+}
+
 void Options::update()
 {
 	StringVector optionStrings = optionsFile.getOptionStrings();
+	bool hasThirdPersonMode = false;
 	for (unsigned int i = 0; i < optionStrings.size();) {
 		std::string key;
 		std::string value;
@@ -262,6 +316,14 @@ void Options::update()
 		}
 
         //LOGI("reading key: %s (%s)\n", key.c_str(), value.c_str());
+
+		if (key == OptionStrings::Performance_DefaultProfile) {
+			int profile = static_cast<int>(activeDefaultProfile);
+			if (readInt(value, profile) &&
+				profile >= static_cast<int>(DefaultProfile::DesktopDefault) &&
+				profile <= static_cast<int>(DefaultProfile::DesktopLowPerformance))
+				activeDefaultProfile = static_cast<DefaultProfile>(profile);
+		}
 
 		// Audio
 		if (key == OptionStrings::Audio_Music) readFloat(value, music);
@@ -352,6 +414,15 @@ void Options::update()
 		if (key == OptionStrings::Game_ThirdPerson) {
 			readBool(value, thirdPersonView);
 		}
+		if (key == OptionStrings::Game_ThirdPersonMode) {
+			int mode = thirdPersonViewMode;
+			if (readInt(value, mode)) {
+				if (mode < THIRD_PERSON_FIRST || mode > THIRD_PERSON_FRONT)
+					mode = THIRD_PERSON_FIRST;
+				thirdPersonViewMode = mode;
+				hasThirdPersonMode = true;
+			}
+		}
 		if (key == OptionStrings::Game_HideGui) {
 			readBool(value, hideGui);
 		}
@@ -370,10 +441,19 @@ void Options::update()
 		if (key == OptionStrings::Extra_DebugScreen) {
 			readBool(value, debugScreenEnabled);
 		}
+		if (key == OptionStrings::Extra_JavaUI) {
+			readBool(value, javaUi);
+		}
 		if (key == OptionStrings::Skin_Menu) {
 			readBool(value, skinMenu);
 		}
 	}
+
+	// Older options files only contain the legacy boolean. Preserve their
+	// previous behaviour by treating an enabled value as third-person back.
+	if (!hasThirdPersonMode)
+		thirdPersonViewMode = thirdPersonView ? THIRD_PERSON_BACK : THIRD_PERSON_FIRST;
+	thirdPersonView = thirdPersonViewMode != THIRD_PERSON_FIRST;
     
 #ifdef __APPLE__
 //    if (minecraft->isSuperFast()) {
@@ -431,6 +511,8 @@ void Options::load()
 void Options::save()
 {
 	StringVector stringVec;
+	addOptionToSaveOutput(stringVec, OptionStrings::Performance_DefaultProfile,
+		static_cast<int>(activeDefaultProfile));
 
 	// Audio
 	addOptionToSaveOutput(stringVec, OptionStrings::Audio_Music, music);
@@ -441,12 +523,14 @@ void Options::save()
 	addOptionToSaveOutput(stringVec, OptionStrings::Multiplayer_ServerVisible, serverVisible);
 	addOptionToSaveOutput(stringVec, OptionStrings::Game_DifficultyLevel, difficulty);
 	addOptionToSaveOutput(stringVec, OptionStrings::Game_ThirdPerson, thirdPersonView);
+	addOptionToSaveOutput(stringVec, OptionStrings::Game_ThirdPersonMode, thirdPersonViewMode);
 	addOptionToSaveOutput(stringVec, OptionStrings::Game_HideGui, hideGui);
 	addOptionToSaveOutput(stringVec, OptionStrings::Extra_InfiniteWorlds, infiniteWorlds);
 	addOptionToSaveOutput(stringVec, OptionStrings::Skin_ArmType, slimSkin);
 	addOptionToSaveOutput(stringVec, OptionStrings::Skin_Menu, skinMenu);
 	addOptionToSaveOutput(stringVec, OptionStrings::Touch_Sneak, touchSneak);
 	addOptionToSaveOutput(stringVec, OptionStrings::Extra_DebugScreen, debugScreenEnabled);
+	addOptionToSaveOutput(stringVec, OptionStrings::Extra_JavaUI, javaUi);
 
 	// Input
 	addOptionToSaveOutput(stringVec, OptionStrings::Controls_InvertMouse, invertYMouse);

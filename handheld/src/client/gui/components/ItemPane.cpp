@@ -73,6 +73,8 @@ void ItemPane::renderBatch( std::vector<GridItem>& items, float alpha )
 	t.beginOverride();
 	for (unsigned int i = 0; i < items.size(); ++i) {
 		GridItem& item = items[i];
+		if (item.id < 0 || item.id >= (int)cat.size() || cat[item.id] == NULL)
+			continue;
 		CItem* citem = cat[item.id];
 
 		ItemRenderer::renderGuiItem(NULL, textures, &citem->item,
@@ -84,6 +86,8 @@ void ItemPane::renderBatch( std::vector<GridItem>& items, float alpha )
 	t.beginOverride();
 	for (unsigned int i = 0; i < items.size(); ++i) {
 		GridItem& item = items[i];
+		if (item.id < 0 || item.id >= (int)cat.size() || cat[item.id] == NULL)
+			continue;
 		CItem* citem = cat[item.id];
 
 		char buf[64] = {0};

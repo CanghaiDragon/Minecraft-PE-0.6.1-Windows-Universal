@@ -312,6 +312,7 @@
     <ClCompile Include="..\..\src\world\level\levelgen\LargeCaveFeature.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\LargeFeature.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\RandomLevelSource.cpp" />
+    <ClCompile Include="..\..\src\world\level\levelgen\AlphaLevelSource.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\SkyLevelSource.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\synth\ImprovedNoise.cpp" />
     <ClCompile Include="..\..\src\world\level\levelgen\synth\PerlinNoise.cpp" />
@@ -918,6 +919,7 @@
     <ClInclude Include="..\..\src\world\level\levelgen\LargeCaveFeature.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\LargeFeature.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\RandomLevelSource.h" />
+    <ClInclude Include="..\..\src\world\level\levelgen\AlphaLevelSource.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\SkyLevelSource.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\synth\ImprovedNoise.h" />
     <ClInclude Include="..\..\src\world\level\levelgen\synth\PerlinNoise.h" />
@@ -1105,6 +1107,17 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="CopyZlibRuntime" AfterTargets="Build">
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\lib\bin\arm\zlib1.dll"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyLanguageAsset" AfterTargets="Build">
+    <MakeDir Directories="$(OutDir)data\lang" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\data\lang\en_US.lang"
+          DestinationFolder="$(OutDir)data\lang"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>
 
 

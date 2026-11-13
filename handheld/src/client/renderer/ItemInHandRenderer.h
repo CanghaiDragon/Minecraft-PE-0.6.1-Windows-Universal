@@ -42,6 +42,7 @@ private:
 	int lastIconRendered;
 	int lastItemRendered;
 	int lastSlot;
+	bool renderedAlphaTextures;
 	ItemInstance item;
 
 	Minecraft* mc;

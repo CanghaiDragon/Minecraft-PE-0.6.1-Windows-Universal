@@ -1,5 +1,7 @@
 #include "OptionStrings.h"
 
+const char* OptionStrings::Performance_DefaultProfile = "performance_default_profile";
+
 const char* OptionStrings::Audio_Music                = "audio_music";
 const char* OptionStrings::Audio_Sound                = "audio_sound";
 
@@ -25,9 +27,11 @@ const char* OptionStrings::Controls_FeedbackVibration  = "feedback_vibration";
 
 const char* OptionStrings::Game_DifficultyLevel = "game_difficulty";
 const char* OptionStrings::Game_ThirdPerson = "game_thirdperson";
+const char* OptionStrings::Game_ThirdPersonMode = "game_thirdperson_mode";
 const char* OptionStrings::Game_HideGui = "game_hidegui";
 const char* OptionStrings::Extra_InfiniteWorlds = "extra_infinite_worlds";
 const char* OptionStrings::Skin_ArmType = "skin_arm_type";
 const char* OptionStrings::Skin_Menu = "skin_menu";
 const char* OptionStrings::Touch_Sneak = "touch_sneak";
 const char* OptionStrings::Extra_DebugScreen = "extra_debug_screen";
+const char* OptionStrings::Extra_JavaUI = "extra_java_ui";

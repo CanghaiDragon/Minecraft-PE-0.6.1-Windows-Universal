@@ -2,6 +2,7 @@
 #define NET_MINECRAFT_WORLD_LEVEL_LEVELGEN__SkyLevelSource_H__
 
 #include "../chunk/ChunkSource.h"
+#include "LargeCaveFeature.h"
 #include "synth/PerlinNoise.h"
 #include <map>
 #include <utility>
@@ -49,6 +50,8 @@ private:
     float br[DENSITY_COUNT];
     float pnr[DENSITY_COUNT];
     float depthBuffer[16 * 16];
+
+    LargeCaveFeature caveFeature;
 
     // Non-owning, like RandomLevelSource: ChunkCache deletes the chunks.
     // Store coordinates themselves so distant infinite chunks cannot alias.

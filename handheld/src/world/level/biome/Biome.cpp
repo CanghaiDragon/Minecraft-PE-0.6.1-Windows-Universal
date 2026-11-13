@@ -19,6 +19,8 @@ Biome* Biome::plains		 = NULL;
 Biome* Biome::iceDesert		 = NULL;
 Biome* Biome::tundra		 = NULL;
 Biome* Biome::sky			 = NULL;
+Biome* Biome::alpha			 = NULL;
+Biome* Biome::winter			 = NULL;
 
 /*static*/
 Biome::MobList Biome::_emptyMobList;
@@ -31,7 +33,9 @@ Biome* Biome::map[64*64];
 Biome::Biome()
 :	topMaterial(((Tile*)Tile::grass)->id),
 	material(((Tile*)Tile::dirt)->id),
-	leafColor(0x4EE031)
+	grassColor(0x339933),
+	leafColor(0x4EE031),
+	snowCovered(false)
 {
     _friendlies.insert(_friendlies.end(), MobSpawnerData(MobTypes::Sheep, 12, 2, 3));
     _friendlies.insert(_friendlies.end(), MobSpawnerData(MobTypes::Pig, 10, 1, 3));
@@ -74,6 +78,12 @@ Biome* Biome::setLeafColor( int leafColor )
 	return this;
 }
 
+Biome* Biome::setGrassColor( int grassColor )
+{
+	this->grassColor = grassColor;
+	return this;
+}
+
 Biome* Biome::setColor( int color )
 {
 	this->color = color;
@@ -82,7 +92,13 @@ Biome* Biome::setColor( int color )
 
 Biome* Biome::setSnowCovered()
 {
+	snowCovered = true;
 	return this;
+}
+
+bool Biome::isSnowCovered() const
+{
+	return snowCovered;
 }
 
 Biome* Biome::clearMobs( bool friendlies /*= true*/, bool waterFriendlies /*= true*/, bool enemies /*= true*/ )
@@ -126,11 +142,19 @@ void Biome::initBiomes() {
 	// FixedBiomeSource supplies the fixed Sky climate.
 	sky				= (new Biome())->setColor(0x8080FF)->setName("Sky");
 	sky->_friendlies.insert(sky->_friendlies.end(), MobSpawnerData(MobTypes::Chicken, 80, 2, 4));
+	alpha				= (new Biome())->setColor(0x77C14E)->setName("Alpha")
+					->setGrassColor(0x77C14E)->setLeafColor(0x40B524);
+	winter				= (new Biome())->setColor(0x77C14E)->setName("Winter")
+						->setGrassColor(0x77C14E)->setLeafColor(0x40B524)->setSnowCovered();
 	
 	recalc();
 }
 /*static*/
 void Biome::teardownBiomes() {
+	delete alpha;
+	alpha = NULL;
+	delete winter;
+	winter = NULL;
 	delete rainForest;		rainForest= NULL;
 	delete swampland;		swampland = NULL;
 	delete seasonalForest;	seasonalForest = NULL;

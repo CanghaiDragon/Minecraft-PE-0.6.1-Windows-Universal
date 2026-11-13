@@ -57,6 +57,7 @@ ScrollingPane::ScrollingPane(
 	_wasDown(false),//Mouse::isButtonDown(MouseAction::ACTION_LEFT)),
 	_lx(-9999), _ly(-9999)
 {
+	highlightItem.id = -1;
 	if (itemBoundingRect.w > 0)
 		itemBbox = itemBoundingRect;
 	else
@@ -125,6 +126,40 @@ void ScrollingPane::mouseScrolled(int delta) {
 	const float nextY = Mth::Min(0.0f, Mth::Max(minPoint.y,
 		_contentOffset.y + delta * itemBbox.h));
 	setContentOffset(_contentOffset.x, nextY);
+}
+
+void ScrollingPane::mouseClicked(float x, float y, int buttonNum) {
+	if (buttonNum != MouseAction::ACTION_LEFT || !_scrollEnabled)
+		return;
+	if (!area.isInside(x, y))
+		return;
+
+	touchesBegan(x, y, getTimeMs());
+	// Prevent the render-time polling path from beginning the same press again.
+	_wasDown = true;
+	_lx = x;
+	_ly = y;
+}
+
+void ScrollingPane::mouseMoved(float x, float y) {
+	if (!_scrollEnabled || !tracking)
+		return;
+
+	touchesMoved(x, y, getTimeMs());
+	_lx = x;
+	_ly = y;
+}
+
+void ScrollingPane::mouseReleased(float x, float y, int buttonNum) {
+	if (buttonNum != MouseAction::ACTION_LEFT || !_scrollEnabled)
+		return;
+
+	// Release can occur outside the pane, so always finish an active drag.
+	if (tracking || dragging)
+		touchesEnded(x, y, getTimeMs());
+	_wasDown = false;
+	_lx = x;
+	_ly = y;
 }
 
 bool ScrollingPane::getGridItemFor_slow(int itemIndex, GridItem& out) {

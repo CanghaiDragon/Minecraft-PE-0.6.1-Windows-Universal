@@ -405,7 +405,10 @@ void Gui::onConfigChanged( const Config& c ) {
 	}
 	rcFeedbackInner = t.end(true, rcFeedbackInner.vboId);
 
-	if (c.minecraft->useTouchscreen()) {
+	// The hotbar presentation belongs to the selected UI family.  Input mode
+	// still controls look/build behavior and the progress indicator, but a
+	// keyboard/mouse device must not silently turn PE UI into the Java hotbar.
+	if (!c.minecraft->options.javaUi) {
 		// I'll bump this up to 6.
 		int num = 6; // without "..." dots
 		if (!c.minecraft->options.isJoyTouchArea && c.width > 480) {
@@ -425,7 +428,7 @@ void Gui::onConfigChanged( const Config& c ) {
 		_numSlots = Mth::Min(7, _numSlots);
 #endif
 	} else {
-		// Keyboard/mouse mode keeps the original desktop/Xperia Play hotbar.
+		// Java-style UI always keeps the original nine-slot hotbar.
 		_numSlots = Inventory::MAX_SELECTION_SIZE;
 	}
 	MAX_MESSAGE_WIDTH = c.guiWidth;
@@ -628,23 +631,32 @@ void Gui::renderHearts() {
 	int oh = minecraft->player->lastHealth;
 	random.setSeed(tickCount * 312871);
 
-	int xx = 2;//screenWidth / 2 - getNumSlots() * 10;
+	const bool javaUi = minecraft->options.javaUi;
+	const int screenWidth = (int)(minecraft->width * InvGuiScale);
+	const int screenHeight = (int)(minecraft->height * InvGuiScale);
+	const int healthY = javaUi ? screenHeight - 32 : 2;
+	const int statWidth = (Player::MAX_HEALTH / 2) * 8;
+	const int hotbarLeft = screenWidth / 2 - getNumSlots() * 10;
+	const int hotbarRight = screenWidth / 2 + getNumSlots() * 10;
+	const int healthX = javaUi ? hotbarLeft : 2;
+	const int armorX = javaUi ? hotbarRight - statWidth : 2;
 
 	int armor = minecraft->player->getArmorValue();
 	for (int i = 0; i < Player::MAX_HEALTH / 2; i++) {
-		int yo = 2;
 		int ip2 = i + i + 1;
 
 		if (armor > 0) {
-		    int xo = xx + 80 + i * 8 + 4;
-		    if (ip2 < armor) blit(xo, yo, 16 + 2 * 9, 9 * 1, 9, 9);
-		    else if (ip2 == armor) blit(xo, yo, 16 + 4 * 9, 9 * 1, 9, 9);
-		    else if (ip2 > armor) blit(xo, yo, 16 + 0 * 9, 9 * 1, 9, 9);
+			const int xo = javaUi ? armorX + i * 8 : healthX + 80 + i * 8 + 4;
+			const int armorIconY = javaUi ? healthY : 2;
+			if (ip2 < armor) blit(xo, armorIconY, 16 + 2 * 9, 9 * 1, 9, 9);
+			else if (ip2 == armor) blit(xo, armorIconY, 16 + 4 * 9, 9 * 1, 9, 9);
+			else if (ip2 > armor) blit(xo, armorIconY, 16 + 0 * 9, 9 * 1, 9, 9);
 		}
 
+		int yo = healthY;
 		int bg = 0;
 		if (blink) bg = 1;
-		int xo = xx + i * 8;
+		int xo = healthX + i * 8;
 		if (h <= 4) {
 			yo = yo + random.nextInt(2) - 1;
 		}

@@ -20,6 +20,7 @@ public:
 protected:
 	virtual void mouseClicked(int x, int y, int buttonNum);
 	virtual void mouseReleased(int x, int y, int buttonNum);
+	virtual void mouseScrolled(int x, int y, int delta);
 
 	virtual void buttonClicked(Button* button);
 

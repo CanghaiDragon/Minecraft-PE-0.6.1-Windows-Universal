@@ -4,9 +4,12 @@
 #include "DistanceChunkSorter.h"
 #include "Chunk.h"
 #include "TileRenderer.h"
+#include "Tesselator.h"
 #include "../Minecraft.h"
 #include "../../util/Mth.h"
+#include "../../util/Random.h"
 #include "../../world/level/Level.h"
+#include "../../world/level/biome/Biome.h"
 #include "../../world/entity/player/Player.h"
 #include "../../world/level/tile/LevelEvent.h"
 #include "../../world/level/tile/LeafTile.h"
@@ -64,7 +67,8 @@ LevelRenderer::LevelRenderer( Minecraft* mc)
 	ticks(0),
 	skyList(0), starList(0), darkList(0),
 	tileRenderer(NULL),
-	destroyProgress(0)
+	destroyProgress(0),
+	xrayRenderActive(false)
 {
 #ifdef USE_VBO
 	// Pool must cover the largest possible dist. allChanged() caps dist at 1024 for
@@ -146,10 +150,13 @@ void LevelRenderer::setLevel( Level* level )
 	xOld = -9999;
 	yOld = -9999;
 	zOld = -9999;
+	xrayRenderActive = false;
 
 	EntityRenderDispatcher::getInstance()->setLevel(level);
 	EntityRenderDispatcher::getInstance()->setMinecraft(mc);
 	this->level = level;
+	Tile::setAlphaTextures(level != NULL
+		&& level->getLevelData()->getWorldType() == WorldType::Alpha);
 
 	delete tileRenderer;
 	tileRenderer = new TileRenderer(level);
@@ -165,6 +172,9 @@ void LevelRenderer::allChanged()
 	// Terrain tint is baked into chunk meshes, therefore update the shared
 	// tile presentation flag immediately before scheduling their rebuild.
 	Tile::setBetaVisuals(mc->options.betaVisuals);
+	Tile::setBetaFancyGraphics(mc->options.betaVisuals && mc->options.fancyGraphics);
+	Tile::setAlphaTextures(level != NULL
+		&& level->getLevelData()->getWorldType() == WorldType::Alpha);
 	deleteChunks();
 
 #ifdef USE_VBO
@@ -467,6 +477,24 @@ int LevelRenderer::render( Mob* player, int layer, float alpha )
 
 	TIMER_POP();
 	return count;
+}
+
+void LevelRenderer::updateXrayRenderState(Mob* player)
+{
+	bool active = false;
+
+	// Java spectator mode suppresses the inside-block overlay only when the
+	// camera head is actually inside an opaque full block.  Merely touching a
+	// block must not enable the effect.
+	if (level != NULL && player != NULL && mc->isCreativeMode()
+		&& mc->options.isFlying && player->noPhysics) {
+		const int headX = Mth::floor(player->x);
+		const int headY = Mth::floor(player->y + player->getHeadHeight());
+		const int headZ = Mth::floor(player->z);
+		active = level->isSolidRenderTile(headX, headY, headZ);
+	}
+
+	xrayRenderActive = active;
 }
 
 void LevelRenderer::renderDebug(const AABB& b, float a) const {
@@ -1131,6 +1159,112 @@ void LevelRenderer::renderBetaClouds(float alpha) {
 	glEnable(GL_CULL_FACE);
 }
 
+bool LevelRenderer::isSnowWeatherActive(Mob* player) const {
+	if (level == NULL || player == NULL) return false;
+	return level->getBiome(Mth::floor(player->x), Mth::floor(player->z)) == Biome::winter;
+}
+
+void LevelRenderer::renderSnowWeather(Mob* player, float alpha) {
+	if (!mc->options.fancyGraphics || !isSnowWeatherActive(player)) return;
+
+	// This is the direct snow-screen pass from Alpha's EntityRenderer, not a
+	// particle pass. Keep the radius tied to Fancy Graphics like Alpha did.
+	const int radius = 10;
+	const int playerX = Mth::floor(player->x);
+	const int playerY = Mth::floor(player->y);
+	const int playerZ = Mth::floor(player->z);
+	const float cameraX = player->xOld + (player->x - player->xOld) * alpha;
+	const float cameraY = player->yOld + (player->y - player->yOld) * alpha;
+	const float cameraZ = player->zOld + (player->z - player->zOld) * alpha;
+
+	glEnable2(GL_TEXTURE_2D);
+	glDisable2(GL_CULL_FACE);
+	glEnable2(GL_BLEND);
+	glBlendFunc2(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable2(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+	glDisable2(GL_ALPHA_TEST);
+	textures->loadAndBindTexture("environment/snow.png");
+
+	Tesselator& t = Tesselator::instance;
+	t.begin();
+	Random snowRandom;
+	const float textureScale = 2.0f;
+	const float time = (float)ticks + alpha;
+	const float vTime = ((float)(ticks & 0x1ff) + alpha) / 512.0f;
+
+	for (int x = playerX - radius; x <= playerX + radius; ++x) {
+		for (int z = playerZ - radius; z <= playerZ + radius; ++z) {
+			if (level->getBiome(x, z) != Biome::winter) continue;
+			if (!level->hasChunk(x >> 4, z >> 4)) continue;
+
+			int top = level->getHeightmap(x, z);
+			if (top < 0) top = 0;
+			if (top > Level::DEPTH) top = Level::DEPTH;
+
+			int y0 = playerY - radius;
+			int y1 = playerY + radius;
+			if (y0 < top) y0 = top;
+			if (y1 < top) y1 = top;
+			if (y0 == y1) continue;
+
+			// Keep the same per-column deterministic pattern and animation
+			// formula as Alpha 1.1.2_01's func_913_h().
+			const long long seed =
+				(long long)x * x * 3121LL +
+				(long long)x * 0x2b24abbLL +
+				(long long)z * z * 0x66397LL +
+				(long long)z * 13761LL;
+			snowRandom.setSeed((long)seed);
+			const float uOffset = snowRandom.nextFloat()
+				+ time * 0.01f * snowRandom.nextGaussian();
+			const float vOffset = snowRandom.nextFloat()
+				+ time * snowRandom.nextGaussian() * 0.001f;
+
+			const float dx = (float)x + 0.5f - player->x;
+			const float dz = (float)z + 0.5f - player->z;
+			const float distance = Mth::sqrt(dx * dx + dz * dz)
+				/ (float)radius;
+			float opacity = (1.0f - distance * distance) * 0.7f;
+			if (opacity <= 0.0f) continue;
+			if (opacity > 0.7f) opacity = 0.7f;
+
+			const float brightness = level->getBrightness(x, 128, z);
+			t.color(brightness, brightness, brightness, opacity);
+
+			const float x0 = (float)x - cameraX;
+			const float x1 = x0 + 1.0f;
+			const float z0 = (float)z - cameraZ;
+			const float z1 = z0 + 1.0f;
+			const float bottom = (float)y0 - cameraY;
+			const float topY = (float)y1 - cameraY;
+			const float v0 = ((float)y0 * textureScale) / 8.0f
+				+ vTime * textureScale + vOffset;
+			const float v1 = ((float)y1 * textureScale) / 8.0f
+				+ vTime * textureScale + vOffset;
+
+			// Two crossed planes reproduce Alpha's 8-vertex snow column.
+			t.vertexUV(x0, bottom, z0, uOffset, v0);
+			t.vertexUV(x1, bottom, z1, textureScale + uOffset, v0);
+			t.vertexUV(x1, topY, z1, textureScale + uOffset, v1);
+			t.vertexUV(x0, topY, z0, uOffset, v1);
+
+			t.vertexUV(x0, bottom, z1, uOffset, v0);
+			t.vertexUV(x1, bottom, z0, textureScale + uOffset, v0);
+			t.vertexUV(x1, topY, z0, textureScale + uOffset, v1);
+			t.vertexUV(x0, topY, z1, uOffset, v1);
+		}
+	}
+	t.endOverrideAndDraw();
+
+	// Restore the state expected by the subsequent selection/cloud/hand passes.
+	glColor4f2(1, 1, 1, 1);
+	glDepthMask(GL_TRUE);
+	glDisable2(GL_BLEND);
+	glEnable2(GL_CULL_FACE);
+	glEnable2(GL_ALPHA_TEST);
+}
+
 void LevelRenderer::playSound(const std::string& name, float x, float y, float z, float volume, float pitch) {
 	// @todo: deny sounds here if sound is off (rather than waiting 'til SoundEngine)
 	float dd = 16;
@@ -1324,19 +1458,19 @@ void LevelRenderer::takePicture( TripodCamera* cam, Entity* entity )
 	// Push old values
 	Mob* oldCameraEntity = mc->cameraTargetPlayer;
 	bool hideGui = mc->options.hideGui;
-	bool thirdPerson = mc->options.thirdPersonView;
+	int thirdPersonMode = mc->options.thirdPersonViewMode;
 
 	// @huge @attn: This is highly illegal, super temp!
 	mc->cameraTargetPlayer = (Mob*)cam;
 	mc->options.hideGui = true;
-	mc->options.thirdPersonView = false;
+	mc->options.setThirdPersonViewMode(Options::THIRD_PERSON_FIRST);
 
 	mc->gameRenderer->renderLevel(0);
 
 	// Pop values back
 	mc->cameraTargetPlayer = oldCameraEntity;
 	mc->options.hideGui = hideGui;
-	mc->options.thirdPersonView = thirdPerson;
+	mc->options.setThirdPersonViewMode(thirdPersonMode);
 
 	_t_keepPic = -1;
 

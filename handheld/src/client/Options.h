@@ -18,6 +18,19 @@ typedef std::vector<std::string> StringVector;
 class Options
 {
 public:
+	// Built-in desktop first-run/reset configurations. Mobile-specific
+	// profiles are intentionally not part of the Win32 settings sync.
+	enum class DefaultProfile {
+		DesktopDefault,
+		DesktopLowPerformance
+	};
+
+	enum ThirdPersonViewMode {
+		THIRD_PERSON_FIRST = 0,
+		THIRD_PERSON_BACK = 1,
+		THIRD_PERSON_FRONT = 2
+	};
+
     class Option
 	{
         const bool _isProgress;
@@ -54,6 +67,7 @@ public:
 		static const Option SKIN_MENU;
 		static const Option TOUCH_SNEAK;
 		static const Option DEBUG_SCREEN;
+		static const Option JAVA_UI;
 
 		static const Option PIXELS_PER_MILLIMETER;
 		static const Option FOV;
@@ -158,6 +172,10 @@ public:
     int difficulty;
     bool hideGui;
     bool thirdPersonView;
+	// 0 = first person, 1 = third-person back, 2 = third-person front.
+	// Keep thirdPersonView as the legacy enabled/disabled flag for existing
+	// renderer and input paths.
+	int thirdPersonViewMode;
     bool renderDebug;
 	// Enables the F3 debug screen and its touch/pause-screen button.
 	bool debugScreenEnabled;
@@ -174,6 +192,7 @@ public:
 	bool serverVisible;
 	bool isJoyTouchArea;
 	bool useTouchScreen;
+	DefaultProfile activeDefaultProfile;
 	bool infiniteWorlds;
 	// Optional Java Beta-inspired presentation.  This is deliberately a
 	// renderer-only preference: it never changes a world's data or generation.
@@ -182,6 +201,9 @@ public:
 	bool slimSkin;
 	bool skinMenu;
 	bool touchSneak;
+	// Use the Java/desktop presentation for menus and inventory independently
+	// of the selected input mode.
+	bool javaUi;
 	float pixelsPerMillimeter;
 	float fieldOfView;
     Options(Minecraft* minecraft, const std::string& workingDirectory)
@@ -196,10 +218,25 @@ public:
 	Options()
 	:	minecraft(NULL)
 	{
-		
+		thirdPersonView = false;
+		thirdPersonViewMode = THIRD_PERSON_FIRST;
+		activeDefaultProfile = DefaultProfile::DesktopDefault;
+		javaUi = false;
 	}
 
-	void initDefaultValues();
+	void initDefaultValues(DefaultProfile profile = DefaultProfile::DesktopDefault);
+	void applyDefaultProfile(DefaultProfile profile);
+	DefaultProfile getDefaultProfile() const { return activeDefaultProfile; }
+	int getLightUpdateBudget() const {
+		return activeDefaultProfile == DefaultProfile::DesktopDefault ? 500 : 96;
+	}
+	float getLightUpdateTimeBudget() const {
+		return activeDefaultProfile == DefaultProfile::DesktopLowPerformance ? 0.003f : -1.0f;
+	}
+	void cycleThirdPersonView();
+	void setThirdPersonViewMode(int mode);
+	void setThirdPersonViewEnabled(bool enabled);
+	bool isThirdPersonFront() const { return thirdPersonViewMode == THIRD_PERSON_FRONT; }
 
     std::string getKeyDescription(int i) {
         //Language language = Language.getInstance();
@@ -250,6 +287,8 @@ public:
 			dpadSize = value;
 			if (dpadSize < 0) dpadSize = 0;
 			if (dpadSize > 2) dpadSize = 2;
+		} else if (item == &Option::THIRD_PERSON) {
+			setThirdPersonViewMode(value);
 		} else if (item == &Option::INPUT_MODE) {
 			useTouchScreen = value != 0;
 		} else if (item == &Option::SKIN_ARM_TYPE) {
@@ -283,8 +322,13 @@ public:
 			debugScreenEnabled = !debugScreenEnabled;
 			if (!debugScreenEnabled) renderDebug = false;
 		}
-        if (option == &Option::VIEW_BOBBING)	bobView = !bobView;
-		if (option == &Option::THIRD_PERSON)	thirdPersonView = !thirdPersonView;
+		if (option == &Option::JAVA_UI) javaUi = !javaUi;
+		if (option == &Option::VIEW_BOBBING)	bobView = !bobView;
+		if (option == &Option::THIRD_PERSON) {
+			int mode = (thirdPersonViewMode + dir) % 3;
+			if (mode < 0) mode += 3;
+			setThirdPersonViewMode(mode);
+		}
 		if (option == &Option::HIDE_GUI)		hideGui = !hideGui;
 		if (option == &Option::SERVER_VISIBLE)		serverVisible = !serverVisible;
 		if (option == &Option::LEFT_HANDED) isLeftHanded = !isLeftHanded;
@@ -332,6 +376,7 @@ public:
 		if(item == &Option::RENDER_DISTANCE) return viewDistance;
 		if(item == &Option::GUI_SCALE) return guiScale;
 		if(item == &Option::DPAD_SIZE) return dpadSize;
+		if(item == &Option::THIRD_PERSON) return thirdPersonViewMode;
 		if(item == &Option::INPUT_MODE) return useTouchScreen ? 1 : 0;
 		if(item == &Option::SKIN_ARM_TYPE) return slimSkin ? 1 : 0;
 		if(item == &Option::GRAPHICS) return fancyGraphics ? 1 : 0;
@@ -382,6 +427,8 @@ public:
 			return touchSneak;
 		if (item == &Option::DEBUG_SCREEN)
 			return debugScreenEnabled;
+		if (item == &Option::JAVA_UI)
+			return javaUi;
 		return false;
 	}
 
@@ -407,6 +454,7 @@ public:
 
 	void setSettingsPath(const std::string& path);
 	bool hasSavedOptions() const { return optionsFile.exists(); }
+	void deleteSavedOptions() { optionsFile.remove(); }
 	void update();
     void load();
     void save();

@@ -5,22 +5,115 @@
 #include "ExternalFileLevelStorage.h"
 #include "FolderMethods.h"
 #include "../chunk/LevelChunk.h"
+#include "../chunk/ChunkCache.h"
 #include "../Level.h"
 #include "../LevelConstants.h"
+#include "../../entity/player/Player.h"
 #include "../tile/TreeTile.h"
 #include "../../entity/EntityFactory.h"
 #include "../../../nbt/NbtIo.h"
 #include "../../../util/RakDataIO.h"
+#include "../../../util/Mth.h"
 #include "../../../raknet/GetTime.h"
+#include "../../../platform/log.h"
 #include "../tile/entity/TileEntity.h"
+
+#include <algorithm>
+#include <cstring>
+#include <stdexcept>
 
 static const int ChunkVersion_Light = 1;
 static const int ChunkVersion_Entity = 2;
+
+// The save queue must distinguish every loaded chunk in an infinite world.
+// x + z * CHUNK_CACHE_WIDTH aliases distant coordinates and is only valid for
+// the old finite-world coordinate range.
+static inline int64_t chunkSaveKey(int x, int z)
+{
+	return ((int64_t)(uint32_t)x << 32) | (uint32_t)z;
+}
 
 const char* const fnLevelDatOld = "level.dat_old";
 const char* const fnLevelDatNew = "level.dat_new";
 const char* const fnLevelDat    = "level.dat";
 const char* const fnPlayerDat   = "player.dat";
+
+// Keep this marker contract identical to the UWP implementation.  Infinite
+// and Sky worlds use the compressed per-chunk format and must not be opened as
+// if they were old raw worlds.  Finite/Old worlds deliberately do not use it.
+const char* const fnUwpStorageMarker = "uwp_storage.version";
+const char UwpStorageMarkerContents[] =
+    "MCPEUWP_STORAGE_V2\n"
+    "CHUNK_CODEC=zlib\n"
+    "ENTITY_STORAGE=per_chunk\n";
+const char UwpStorageMarkerV1Contents[] =
+    "MCPEUWP_STORAGE_V1\n"
+    "CHUNK_CODEC=raw\n"
+    "ENTITY_STORAGE=per_chunk\n";
+
+bool hasRecognizedUwpStorageMarker(const std::string& directory)
+{
+    const std::string filename = directory + "/" + fnUwpStorageMarker;
+    FILE* file = fopen(filename.c_str(), "rb");
+    if (!file)
+        return false;
+
+    char contents[sizeof(UwpStorageMarkerContents)] = {};
+    const size_t bytesRead = fread(contents, 1, sizeof(contents), file);
+    fclose(file);
+
+    const size_t currentSize = sizeof(UwpStorageMarkerContents) - 1;
+    const size_t v1Size = sizeof(UwpStorageMarkerV1Contents) - 1;
+    return (bytesRead == currentSize &&
+        memcmp(contents, UwpStorageMarkerContents, currentSize) == 0) ||
+        (bytesRead == v1Size &&
+        memcmp(contents, UwpStorageMarkerV1Contents, v1Size) == 0);
+}
+
+bool hasCurrentUwpStorageMarker(const std::string& directory)
+{
+    const std::string filename = directory + "/" + fnUwpStorageMarker;
+    FILE* file = fopen(filename.c_str(), "rb");
+    if (!file)
+        return false;
+
+    char contents[sizeof(UwpStorageMarkerContents)] = {};
+    const size_t bytesRead = fread(contents, 1, sizeof(contents), file);
+    fclose(file);
+    const size_t size = sizeof(UwpStorageMarkerContents) - 1;
+    return bytesRead == size && memcmp(contents, UwpStorageMarkerContents, size) == 0;
+}
+
+bool writeCurrentUwpStorageMarker(const std::string& directory)
+{
+    const std::string filename = directory + "/" + fnUwpStorageMarker;
+    if (hasCurrentUwpStorageMarker(directory))
+        return true;
+
+    const std::string temporaryFilename = filename + ".tmp";
+    FILE* file = fopen(temporaryFilename.c_str(), "wb");
+    if (!file)
+        return false;
+
+    const size_t size = sizeof(UwpStorageMarkerContents) - 1;
+    const bool written = fwrite(UwpStorageMarkerContents, 1, size, file) == size;
+    const bool closed = fclose(file) == 0;
+    if (!written || !closed)
+    {
+        remove(temporaryFilename.c_str());
+        return false;
+    }
+
+    // Write through a temporary file so a partially written marker is never
+    // accepted as a valid storage marker.
+    remove(filename.c_str());
+    if (rename(temporaryFilename.c_str(), filename.c_str()) != 0)
+    {
+        remove(temporaryFilename.c_str());
+        return false;
+    }
+    return true;
+}
 
 //
 // Helpers for converting old levels to newer
@@ -92,6 +185,18 @@ ExternalFileLevelStorage::ExternalFileLevelStorage(const std::string& levelId, c
 	loadedLevelData = new LevelData();
 	if (readLevelData(levelPath, *loadedLevelData))
 	{
+		// Infinite/Sky worlds are only valid when their storage contract is
+		// explicitly identified.  Finite/Old worlds retain the original format.
+		if (loadedLevelData->isInfinite() &&
+			!hasRecognizedUwpStorageMarker(levelPath))
+		{
+			LOGW("UWP refusing legacy Infinite/Sky world without storage marker: %s\n",
+				levelPath.c_str());
+			delete loadedLevelData;
+			loadedLevelData = NULL;
+			throw std::runtime_error("MCPEUWP_LEGACY_INFINITE_STORAGE");
+		}
+
 		loadedStorageVersion = loadedLevelData->getStorageVersion();
 		readPlayerData(levelFileName, *loadedLevelData);
 	} else {
@@ -102,10 +207,24 @@ ExternalFileLevelStorage::ExternalFileLevelStorage(const std::string& levelId, c
 
 ExternalFileLevelStorage::~ExternalFileLevelStorage()
 {
+	clearPendingChunkEntityTags();
 	delete regionFile;
 	delete loadedLevelData;
 	for (auto& kv : regionFiles)
 		delete kv.second;
+}
+
+void ExternalFileLevelStorage::clearPendingChunkEntityTags()
+{
+	for (auto& entry : pendingChunkEntityTags) {
+		for (std::size_t i = 0; i < entry.second.size(); ++i) {
+			if (entry.second[i] != NULL) {
+				entry.second[i]->deleteChildren();
+				delete entry.second[i];
+			}
+		}
+	}
+	pendingChunkEntityTags.clear();
 }
 
 void ExternalFileLevelStorage::saveLevelData(LevelData& levelData, std::vector<Player*>* players) {
@@ -139,6 +258,11 @@ void ExternalFileLevelStorage::saveLevelData( const std::string& levelPath, Leve
         LOGE("Error@saveLevelData: Couldn't move new file to level.dat\n");
         return;
     }
+
+	// New markers are written only for newly saved Infinite/Sky storage.  Old
+	// finite worlds remain byte-for-byte free of this UWP-only gate.
+	if (levelData.isInfinite() && !writeCurrentUwpStorageMarker(levelPath))
+		LOGE("UWP could not write storage marker at %s\n", levelPath.c_str());
 
     // Remove the temporary save, if the rename didn't do it
     remove(tmpFile.c_str());
@@ -296,34 +420,74 @@ void ExternalFileLevelStorage::tick()
 	tickCount++;
 	if ((tickCount % 50) == 0 && level)
 	{
-		// look for chunks that needs to be saved
-		for (int z = 0; z < CHUNK_CACHE_WIDTH; z++)
+		// Enumerate only resident chunks.  Calling Level::getChunk() for every
+		// coordinate would generate missing chunks and is not valid for infinite
+		// worlds.
+		ChunkSource* chunkSource = level->getChunkSource();
+		if (chunkSource != NULL && chunkSource->isChunkCache)
 		{
-			for (int x = 0; x < CHUNK_CACHE_WIDTH; x++)
+			ChunkCache* chunkCache = static_cast<ChunkCache*>(chunkSource);
+			std::vector<LevelChunk*> loadedChunks;
+			chunkCache->getLoadedChunks(loadedChunks);
+			for (LevelChunk* chunk : loadedChunks)
 			{
-				LevelChunk* chunk = level->getChunk(x, z);
-				if (chunk && chunk->unsaved)
+				if (chunk == NULL || !chunk->unsaved ||
+					(!level->isInfinite() && !chunk->terrainPopulated))
+					continue;
+
+				const int64_t pos = chunkSaveKey(chunk->x, chunk->z);
+				UnsavedChunkList::iterator prev = unsavedChunkList.begin();
+				for (; prev != unsavedChunkList.end(); ++prev)
 				{
-					int pos = x + z * CHUNK_CACHE_WIDTH;
-					UnsavedChunkList::iterator prev = unsavedChunkList.begin();
-					for ( ; prev != unsavedChunkList.end(); ++prev)
+					if ((*prev).pos == pos)
 					{
-						if ((*prev).pos == pos)
+						// The chunk has been modified again, so update its time.
+						(*prev).addedToList = RakNet::GetTimeMS();
+						break;
+					}
+				}
+				if (prev == unsavedChunkList.end())
+				{
+					UnsavedLevelChunk unsaved;
+					unsaved.pos = pos;
+					unsaved.addedToList = RakNet::GetTimeMS();
+					unsaved.chunk = chunk;
+					unsavedChunkList.push_back(unsaved);
+				}
+				// Do not clear unsaved here.  The queue is only a scheduling list;
+				// save() clears the flag after a successful disk write.
+			}
+		}
+		else if (!level->isInfinite())
+		{
+			// Preserve the legacy finite-world fallback for non-ChunkCache
+			// sources.  It is not used by the normal world path.
+			for (int z = 0; z < CHUNK_CACHE_WIDTH; z++)
+			{
+				for (int x = 0; x < CHUNK_CACHE_WIDTH; x++)
+				{
+					LevelChunk* chunk = level->getChunk(x, z);
+					if (chunk && chunk->unsaved)
+					{
+						const int64_t pos = chunkSaveKey(x, z);
+						UnsavedChunkList::iterator prev = unsavedChunkList.begin();
+						for (; prev != unsavedChunkList.end(); ++prev)
 						{
-							// the chunk has been modified again, so update its time
-							(*prev).addedToList = RakNet::GetTimeMS();
-							break;
+							if ((*prev).pos == pos)
+							{
+								(*prev).addedToList = RakNet::GetTimeMS();
+								break;
+							}
+						}
+						if (prev == unsavedChunkList.end())
+						{
+							UnsavedLevelChunk unsaved;
+							unsaved.pos = pos;
+							unsaved.addedToList = RakNet::GetTimeMS();
+							unsaved.chunk = chunk;
+							unsavedChunkList.push_back(unsaved);
 						}
 					}
-					if (prev == unsavedChunkList.end())
-					{
-						UnsavedLevelChunk unsaved;
-						unsaved.pos = pos;
-						unsaved.addedToList = RakNet::GetTimeMS();
-						unsaved.chunk = chunk;
-						unsavedChunkList.push_back(unsaved);
-					}
-					chunk->unsaved = false; // not actually saved, but in our working list at least
 				}
 			}
 		}
@@ -358,7 +522,7 @@ RegionFile* ExternalFileLevelStorage::getOrOpenRegion(int cx, int cz)
 
 	std::string path = levelPath + "/chunks.r." +
 	                   std::to_string(rx) + "." + std::to_string(rz) + ".dat";
-	RegionFile* rf = new RegionFile(path, true);
+	RegionFile* rf = new RegionFile(path, true, true);
 	if (!rf->open())
 	{
 		delete rf;
@@ -409,7 +573,90 @@ void ExternalFileLevelStorage::save(Level* level, LevelChunk* levelChunk)
 
 	chunkData.Write((const char*)levelChunk->updateMap, CHUNK_COLUMNS);
 
-	rf->writeChunk(lx, lz, chunkData);
+	// Infinite-world chunks store their entities in the chunk record.  Players
+	// remain in player.dat/level.dat and are deliberately excluded here.
+	if (level->isInfinite()) {
+		ListTag* entityTags = new ListTag();
+		int entityCount = 0;
+		for (unsigned int i = 0; i < level->entities.size(); ++i) {
+			Entity* entity = level->entities[i];
+			if (entity == NULL || entity->isPlayer() ||
+				Mth::floor(entity->x / 16.0f) != cx ||
+				Mth::floor(entity->z / 16.0f) != cz)
+				continue;
+
+			CompoundTag* tag = new CompoundTag();
+			if (entity->save(tag)) {
+				entityTags->add(tag);
+				++entityCount;
+			} else {
+				delete tag;
+			}
+		}
+
+		ListTag* tileEntityTags = new ListTag();
+		int tileEntityCount = 0;
+		const LevelChunk::TEMap& chunkTileEntities = levelChunk->getTileEntityMap();
+		for (LevelChunk::TEMapCIterator it = chunkTileEntities.begin();
+			it != chunkTileEntities.end(); ++it) {
+			TileEntity* tileEntity = it->second;
+			if (tileEntity == NULL || tileEntity->isRemoved() ||
+				!tileEntity->shouldSave())
+				continue;
+
+			CompoundTag* tag = new CompoundTag();
+			if (tileEntity->save(tag)) {
+				tileEntityTags->add(tag);
+				++tileEntityCount;
+			} else {
+				delete tag;
+			}
+		}
+
+		// Preserve entities that were read from this chunk but have not yet been
+		// instantiated by the deferred loader.
+		const int64_t entityKey =
+			((int64_t)(uint32_t)cx << 32) | (uint32_t)cz;
+		auto pending = pendingChunkEntityTags.find(entityKey);
+		if (pending != pendingChunkEntityTags.end()) {
+			for (std::size_t i = 0; i < pending->second.size(); ++i) {
+				if (pending->second[i] != NULL) {
+					entityTags->add(static_cast<CompoundTag*>(
+						pending->second[i]->copy()));
+					++entityCount;
+				}
+			}
+		}
+
+		CompoundTag chunkMetadata;
+		chunkMetadata.put("Entities", entityTags);
+		chunkMetadata.put("TileEntities", tileEntityTags);
+		chunkMetadata.putByte("TerrainPopulated",
+			levelChunk->terrainPopulated ? 1 : 0);
+
+		RakNet::BitStream entityData;
+		RakDataOutput entityOutput(entityData);
+		NbtIo::write(&chunkMetadata, &entityOutput);
+		const int entityBytes = entityData.GetNumberOfBytesUsed();
+
+		chunkData.Write(ChunkVersion_Entity);
+		chunkData.Write(entityBytes);
+		if (entityBytes > 0)
+			chunkData.Write((const char*)entityData.GetData(), entityBytes);
+
+		chunkMetadata.deleteChildren();
+		LOGI("Saving chunk entities: %d,%d count=%d bytes=%d\n",
+			cx, cz, entityCount + tileEntityCount, entityBytes);
+	}
+
+	const bool writeSucceeded = rf->writeChunk(lx, lz, chunkData);
+	if (writeSucceeded)
+	{
+		// The chunk is clean only after the complete record, including its
+		// optional entity and tile-entity data, has reached the region file.
+		levelChunk->createdFromSave = true;
+		levelChunk->unsaved = false;
+	}
 
 	//LOGI("Saved chunk (%d, %d)\n", levelChunk->x, levelChunk->z);
 }
@@ -466,21 +713,87 @@ LevelChunk* ExternalFileLevelStorage::load(Level* level, int x, int z)
 		chunkData->Read((char*)levelChunk->blockLight.data, CHUNK_BLOCK_COUNT / 2);
 	}
 	chunkData->Read((char*)levelChunk->updateMap, CHUNK_COLUMNS);
-	// This will be difficult to maintain.. Storage version could be per chunk
-	// too (but probably better to just read all -> write all, so that all
-	// chunks got same version anyway)
-	//if (loadedStorageVersion >= ChunkVersion_Entity) {
-	//	int dictSize;
-	//	chunkData->Read(dictSize);
 
-	//	RakDataInput dis(*chunkData);
-	//	Tag* tmp = Tag::readNamedTag(&dis);
-	//	if (tmp && tmp->getId() == Tag::TAG_Compound) {
-	//		CompoundTag* tag = (CompoundTag*) tmp;
+	// The population state and entity lists are stored in the optional chunk
+	// metadata suffix.  Ordinary entities are instantiated lazily below; tile
+	// entities are restored immediately because the chunk owns their map.
+	bool savedTerrainPopulated = true;
+	if (level->isInfinite()) {
+		const unsigned int entityHeaderBytes = sizeof(int) * 2;
+		if (chunkData->GetNumberOfUnreadBits() >= entityHeaderBytes * 8) {
+			int entityVersion = 0;
+			int entityBytes = 0;
+			if (chunkData->Read(entityVersion) && chunkData->Read(entityBytes) &&
+				entityVersion == ChunkVersion_Entity && entityBytes >= 0 &&
+				static_cast<unsigned int>(entityBytes) <=
+					chunkData->GetNumberOfUnreadBits() / 8) {
+				if (entityBytes > 0) {
+					unsigned char* entityBuffer = new unsigned char[entityBytes];
+					if (chunkData->Read((char*)entityBuffer, entityBytes)) {
+						RakNet::BitStream entityStream(entityBuffer, entityBytes, false);
+						RakDataInput entityInput(entityStream);
+						CompoundTag* chunkMetadata = NbtIo::read(&entityInput);
+						if (chunkMetadata != NULL &&
+							chunkMetadata->contains("TerrainPopulated", Tag::TAG_Byte)) {
+							savedTerrainPopulated =
+								chunkMetadata->getBoolean("TerrainPopulated");
+						}
 
-	//		delete tmp;
-	//	}
-	//}
+						if (chunkMetadata != NULL &&
+							chunkMetadata->contains("Entities", Tag::TAG_List)) {
+							ListTag* entityTags = chunkMetadata->getList("Entities");
+			if (entityTags->size() > 0) {
+				const int64_t entityKey =
+					((int64_t)(uint32_t)x << 32) | (uint32_t)z;
+				std::vector<CompoundTag*>& pending =
+					pendingChunkEntityTags[entityKey];
+				for (int i = 0; i < entityTags->size(); ++i) {
+					Tag* rawTag = entityTags->get(i);
+					if (rawTag != NULL &&
+						rawTag->getId() == Tag::TAG_Compound)
+						pending.push_back(static_cast<CompoundTag*>(
+							rawTag->copy()));
+				}
+							}
+						}
+
+						if (chunkMetadata != NULL &&
+							chunkMetadata->contains("TileEntities", Tag::TAG_List)) {
+							ListTag* tileEntityTags =
+								chunkMetadata->getList("TileEntities");
+							for (int i = 0; i < tileEntityTags->size(); ++i) {
+								Tag* rawTag = tileEntityTags->get(i);
+								if (rawTag == NULL ||
+									rawTag->getId() != Tag::TAG_Compound)
+									continue;
+
+								TileEntity* tileEntity = TileEntity::loadStatic(
+									static_cast<CompoundTag*>(rawTag));
+								if (tileEntity == NULL)
+									continue;
+
+								if (!levelChunk->hasTileEntityAt(tileEntity)) {
+									levelChunk->addTileEntity(tileEntity);
+									if (levelChunk->hasTileEntityAt(tileEntity))
+										level->tileEntities.push_back(tileEntity);
+									else
+										delete tileEntity;
+								} else {
+									delete tileEntity;
+								}
+							}
+						}
+
+						if (chunkMetadata != NULL) {
+							chunkMetadata->deleteChildren();
+							delete chunkMetadata;
+						}
+					}
+					delete[] entityBuffer;
+				}
+			}
+		}
+	}
 
 	delete [] chunkData->GetData();
 	delete chunkData;
@@ -517,9 +830,17 @@ LevelChunk* ExternalFileLevelStorage::load(Level* level, int x, int z)
 	//if (loadedStorageVersion > SharedConstants::StorageVersion)
 		changed |= LevelConverters::ReplaceUnavailableBlocks(levelChunk);
 
-	levelChunk->recalcHeightmap();
+	// The chunk record already contains complete sky/block light arrays.  Only
+	// rebuild the heightmap here so loading does not overwrite serialized light
+	// data before the normal lighting system resumes.
+	if (loadedStorageVersion >= ChunkVersion_Light) {
+		levelChunk->recalcHeightmapOnly();
+	} else {
+		levelChunk->recalcHeightmap();
+		changed = true;
+	}
 	levelChunk->unsaved = changed;
-	levelChunk->terrainPopulated = true;
+	levelChunk->terrainPopulated = savedTerrainPopulated;
 	levelChunk->createdFromSave = true;
 
 	return levelChunk;
@@ -527,6 +848,14 @@ LevelChunk* ExternalFileLevelStorage::load(Level* level, int x, int z)
 
 void ExternalFileLevelStorage::saveEntities( Level* level, LevelChunk* levelChunk )
 {
+	// Infinite-world entities are serialized in their owning chunk records.
+	// Keep the legacy global file for finite/Old worlds only.
+	if (level != NULL && level->isInfinite()) {
+		(void)levelChunk;
+		lastSavedEntitiesTick = tickCount;
+		return;
+	}
+
 	lastSavedEntitiesTick = tickCount;
 	int count = 0;
 	float st = getTimeS();
@@ -590,6 +919,13 @@ void ExternalFileLevelStorage::saveEntities( Level* level, LevelChunk* levelChun
 }
 
 void ExternalFileLevelStorage::loadEntities(Level* level, LevelChunk* chunk) {
+	// Infinite-world chunks load their entity records from the chunk suffix;
+	// reading entities.dat here would duplicate them or reintroduce stale data.
+	if (level != NULL && level->isInfinite()) {
+		(void)chunk;
+		return;
+	}
+
 	lastSavedEntitiesTick = tickCount;
 	FILE* fp = fopen((levelPath + "/entities.dat").c_str(), "rb");
 	if (fp) {
@@ -667,6 +1003,94 @@ void ExternalFileLevelStorage::loadEntities(Level* level, LevelChunk* chunk) {
 	}
 }
 
+bool ExternalFileLevelStorage::loadDeferredEntities(Level* level, int maxEntities)
+{
+	if (level == NULL || !level->isInfinite() || maxEntities <= 0)
+		return pendingChunkEntityTags.empty();
+
+	// Only instantiate entities near a player.  Chunk preloading can cover a
+	// much larger area than the active simulation range, so restoring all NBT
+	// records in one frame would cause a noticeable startup spike.
+	static const int EntityActivationRadius = 4;
+	struct PendingChunkCandidate {
+		int64_t key;
+		int chunkX;
+		int chunkZ;
+		int distanceSquared;
+	};
+
+	std::vector<PendingChunkCandidate> candidates;
+	candidates.reserve(pendingChunkEntityTags.size());
+
+	for (auto it = pendingChunkEntityTags.begin();
+		it != pendingChunkEntityTags.end(); ++it) {
+		const int chunkX = static_cast<int>(
+			static_cast<uint64_t>(it->first) >> 32);
+		const int chunkZ = static_cast<int>(static_cast<uint32_t>(it->first));
+		int nearestDistanceSquared = 0x7fffffff;
+
+		for (unsigned int i = 0; i < level->players.size(); ++i) {
+			Player* player = level->players[i];
+			if (player == NULL || player->removed)
+				continue;
+
+			const int playerChunkX = Mth::floor(player->x / 16.0f);
+			const int playerChunkZ = Mth::floor(player->z / 16.0f);
+			const int dx = Mth::abs(chunkX - playerChunkX);
+			const int dz = Mth::abs(chunkZ - playerChunkZ);
+			if (dx <= EntityActivationRadius && dz <= EntityActivationRadius) {
+				const int distanceSquared = dx * dx + dz * dz;
+				if (distanceSquared < nearestDistanceSquared)
+					nearestDistanceSquared = distanceSquared;
+			}
+		}
+
+		if (nearestDistanceSquared != 0x7fffffff)
+			candidates.push_back(PendingChunkCandidate{
+				it->first, chunkX, chunkZ, nearestDistanceSquared});
+	}
+
+	std::sort(candidates.begin(), candidates.end(),
+		[](const PendingChunkCandidate& left,
+			const PendingChunkCandidate& right) {
+			if (left.distanceSquared != right.distanceSquared)
+				return left.distanceSquared < right.distanceSquared;
+			if (left.chunkX != right.chunkX)
+				return left.chunkX < right.chunkX;
+			return left.chunkZ < right.chunkZ;
+		});
+
+	int loaded = 0;
+	for (std::size_t candidateIndex = 0;
+		candidateIndex < candidates.size() && loaded < maxEntities;
+		++candidateIndex) {
+		auto it = pendingChunkEntityTags.find(candidates[candidateIndex].key);
+		if (it == pendingChunkEntityTags.end())
+			continue;
+
+		std::vector<CompoundTag*>& tags = it->second;
+		while (!tags.empty() && loaded < maxEntities) {
+			CompoundTag* entityTag = tags.back();
+			tags.pop_back();
+			if (entityTag != NULL) {
+				if (Entity* entity = EntityFactory::loadEntity(entityTag, level))
+					level->addEntity(entity, false);
+				entityTag->deleteChildren();
+				delete entityTag;
+			}
+			++loaded;
+		}
+
+		if (tags.empty())
+			pendingChunkEntityTags.erase(it);
+	}
+
+	if (loaded > 0)
+		LOGI("Loaded %d nearby chunk entities; pending chunks=%u\n",
+			loaded, static_cast<unsigned int>(pendingChunkEntityTags.size()));
+	return pendingChunkEntityTags.empty();
+}
+
 void ExternalFileLevelStorage::saveGame(Level* level) {
 	saveEntities(level, NULL);
 }
@@ -676,7 +1100,7 @@ int ExternalFileLevelStorage::savePendingUnsavedChunks( int maxCount ) {
         maxCount = unsavedChunkList.size();
 
     int count = 0;
-    while (++count <= maxCount && !unsavedChunkList.empty()) {
+    while (count < maxCount && !unsavedChunkList.empty()) {
 
         UnsavedChunkList::iterator it = unsavedChunkList.begin();
         UnsavedChunkList::iterator remove = unsavedChunkList.begin();
@@ -688,10 +1112,17 @@ int ExternalFileLevelStorage::savePendingUnsavedChunks( int maxCount ) {
                 remove = it;
             }
         }
-        LevelChunk* chunk = oldest->chunk;
+        // Copy the queue record before erasing its list node.
+        const UnsavedLevelChunk pending = *oldest;
+        LevelChunk* chunk = pending.chunk;
         unsavedChunkList.erase(remove);
 
-        save(level, chunk);
+        // saveAll() may have written a queued chunk through the direct list
+        // before we reach this deferred queue.  Avoid writing that now-clean
+        // chunk a second time.
+        if (chunk != NULL && chunk->unsaved)
+            save(level, chunk);
+        ++count;
     }
     return count;
 }
@@ -699,7 +1130,19 @@ int ExternalFileLevelStorage::savePendingUnsavedChunks( int maxCount ) {
 void ExternalFileLevelStorage::saveAll( Level* level, std::vector<LevelChunk*>& levelChunks ) {
     ChunkStorage::saveAll(level, levelChunks);
 	int numChunks = savePendingUnsavedChunks(-1);
+	flush();
     LOGI("Saving %d additional chunks.\n", numChunks);
+}
+
+void ExternalFileLevelStorage::flush()
+{
+	if (regionFile)
+		regionFile->flush();
+	for (auto& kv : regionFiles)
+		if (kv.second)
+			kv.second->flush();
+	if (entitiesFile)
+		entitiesFile->flush();
 }
 
 void ExternalFileLevelStorage::finishPreload()

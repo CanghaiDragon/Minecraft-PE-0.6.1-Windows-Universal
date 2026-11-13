@@ -21,7 +21,7 @@ public:
 	}
 
 	void init() {
-		if (minecraft->useTouchscreen())
+		if (!minecraft->options.javaUi)
 			_back = new Touch::TButton(1, "Ok");
 		else
 			_back = new Button(1, "Ok");

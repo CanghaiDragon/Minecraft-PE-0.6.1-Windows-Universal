@@ -37,6 +37,7 @@ private:
 	LargeImageButton bJoin;
 	LargeImageButton bOptions;
 	ImageButton bQuit;
+	ImageButton bSkin;
 	TButton bTest;
 	BuyButton bBuy;
 

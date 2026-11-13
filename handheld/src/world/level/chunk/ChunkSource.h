@@ -34,6 +34,8 @@ public:
 
     virtual bool shouldSave() = 0;
 	virtual void saveAll(bool onlyUnsaved) {}
+	// Requeue lighting for the resident 3x3 area around the active player.
+	virtual void queueLightUpdatesAround(int chunkX, int chunkZ) {}
 
 	virtual Biome::MobList getMobsAt(const MobCategory& mobCategory, int x, int y, int z) = 0;
 

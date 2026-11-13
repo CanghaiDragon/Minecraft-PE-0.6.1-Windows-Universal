@@ -316,6 +316,7 @@ void GameRenderer::renderLevel(float a) {
         frustum.prepare(xOff, yOff, zOff);
 
 		TIMER_POP_PUSH("culling");
+		mc->levelRenderer->updateXrayRenderState(cameraEntity);
         mc->levelRenderer->cull(&frustum, a);
         mc->levelRenderer->updateDirtyChunks(cameraEntity, false);
 
@@ -366,30 +367,45 @@ void GameRenderer::renderLevel(float a) {
         setupFog(0);
         glEnable2(GL_BLEND);
         glDisable2(GL_CULL_FACE);
-		glDepthMask(GL_FALSE);
         glDisable2(GL_ALPHA_TEST);
 		mc->textures->loadAndBindTexture("terrain.png");
-        //if (mc->options.fancyGraphics) {
-        //    glColorMask(false, false, false, false);
-        //    int visibleWaterChunks = levelRenderer->render(cameraEntity, 1, a);
-        //    glColorMask(true, true, true, true);
-        //    if (mc->options.anaglyph3d) {
-        //        if (i == 0) glColorMask(false, true, true, false);
-        //        else glColorMask(true, false, false, false);
-        //    }
-        //    if (visibleWaterChunks > 0) {
-        //        levelRenderer->renderSameAsLast(1, a);
-        //    }
-        //} else
-		{
-			//glDepthRangef(0.1f, 1.0f);
-			//glDepthMask(GL_FALSE);
+		const bool betaFancyTranslucency =
+			mc->options.betaVisuals && mc->options.fancyGraphics;
+		if (betaFancyTranslucency) {
+			// Match Java Beta's Fancy pass-1 depth prepass: submit the same
+			// sorted transparent chunk lists once with color writes disabled,
+			// then replay those lists for the visible color pass. Ice and water
+			// are both in layer 2, so this applies to both together.
+			if (mc->options.ambientOcclusion) {
+				glShadeModel2(GL_SMOOTH);
+			}
+			glEnable2(GL_DEPTH_TEST);
+			glDepthMask(GL_TRUE);
+			glColorMask(false, false, false, false);
+			TIMER_POP_PUSH("terrain-water-depth");
+			int visibleBlendChunks = levelRenderer->render(cameraEntity, 2, a);
+
+			if (mc->options.anaglyph3d) {
+				if (i == 0) glColorMask(false, true, true, false);
+				else glColorMask(true, false, false, false);
+			} else {
+				glColorMask(true, true, true, true);
+			}
+
+			if (visibleBlendChunks > 0) {
+				TIMER_POP_PUSH("terrain-water-color");
+				levelRenderer->renderSameAsLast(2, a);
+			}
+			glShadeModel2(GL_FLAT);
+		} else {
+			// PE and Beta+Fast retain the established single transparent water
+			// pass. Ice is opaque in these modes and was already rendered in
+			// layer 0.
+			glDepthMask(GL_FALSE);
 			TIMER_POP_PUSH("terrain-water");
 			glEnable2(GL_DEPTH_TEST);
-            levelRenderer->render(cameraEntity, 2, a);
-			//glDepthRangef(0, 1);
-
-        }
+			levelRenderer->render(cameraEntity, 2, a);
+		}
         
 		glDepthMask(GL_TRUE);
         glEnable2(GL_CULL_FACE);
@@ -418,6 +434,36 @@ void GameRenderer::renderLevel(float a) {
 			levelRenderer->renderBetaClouds(a);
 			glDisable2(GL_FOG);
 		}
+
+		const bool snowWeather =
+			mc->options.fancyGraphics && levelRenderer->isSnowWeatherActive(cameraEntity);
+
+		// Alpha's winter visual is a direct snow-screen pass rather than a
+		// weather particle system. Beta clouds have already populated the depth
+		// buffer, so rebuild only opaque terrain depth before drawing the snow.
+		// This removes cloud depth while preserving terrain occlusion.
+		glDisable2(GL_FOG);
+		if (snowWeather && mc->options.betaVisuals) {
+			glClear(GL_DEPTH_BUFFER_BIT);
+			glEnable2(GL_DEPTH_TEST);
+			glDepthMask(GL_TRUE);
+			glEnable2(GL_CULL_FACE);
+			glDisable2(GL_BLEND);
+			glEnable2(GL_ALPHA_TEST);
+			glEnable2(GL_TEXTURE_2D);
+			glColorMask(false, false, false, false);
+			mc->textures->loadAndBindTexture("terrain.png");
+			TIMER_POP_PUSH("snow-terrain-depth");
+			levelRenderer->render(cameraEntity, 0, a);
+
+			if (mc->options.anaglyph3d) {
+				if (i == 0) glColorMask(false, true, true, false);
+				else glColorMask(true, false, false, false);
+			} else {
+				glColorMask(true, true, true, true);
+			}
+		}
+		levelRenderer->renderSnowWeather(cameraEntity, a);
         setupFog(1);
 
         if (zoom == 1) {
@@ -500,9 +546,19 @@ void GameRenderer::moveCameraToPlayer(float a) {
             glTranslatef2(0, 0, (float) -cameraDist);
             glRotatef2(xRot, 1, 0, 0);
             glRotatef2(rotationY, 0, 1, 0);
-        } else {
-            float yRot = player->yRot;
-            float xRot = player->xRot/* + 180.0f*/;
+		} else {
+			float yRot = player->yRotO + (player->yRot - player->yRotO) * a;
+			float xRot = player->xRotO + (player->xRot - player->xRotO) * a;
+			const bool thirdPersonFront = mc->options.isThirdPersonFront();
+
+			// The front camera is the same orbit as the back camera, but on the
+			// opposite side of the player. Invert pitch for the collision test
+			// and final orientation so looking up/down stays natural.
+			if (thirdPersonFront) {
+				yRot += 180.0f;
+				xRot = -xRot;
+			}
+
             float xd = -Mth::sin(yRot / 180 * Mth::PI) * Mth::cos(xRot / 180 * Mth::PI) * cameraDist;
             float zd = Mth::cos(yRot / 180 * Mth::PI) * Mth::cos(xRot / 180 * Mth::PI) * cameraDist;
             float yd = -Mth::sin(xRot / 180 * Mth::PI) * cameraDist;
@@ -516,28 +572,31 @@ void GameRenderer::moveCameraToPlayer(float a) {
                 yo *= 0.1f;
                 zo *= 0.1f;
 
-                HitResult hr = mc->level->clip(Vec3(x + xo, y + yo, z + zo), Vec3(x - xd + xo + zo, y - yd + yo, z - zd + zo)); // newTemp
+				HitResult hr = mc->level->clip(Vec3(x + xo, y + yo, z + zo), Vec3(x - xd + xo, y - yd + yo, z - zd + zo)); // newTemp
 				if (hr.type != NO_HIT) {
                     float dist = hr.pos.distanceTo(Vec3(x, y, z)); // newTemp
                     if (dist < cameraDist) cameraDist = dist;
                 }
             }
 
-			//glRotatef2(180, 0, 1, 0);
-
-			glRotatef2(player->xRot - xRot, 1, 0, 0);
-            glRotatef2(player->yRot - yRot, 0, 1, 0);
-            glTranslatef2(0, 0, (float) -cameraDist);
-            glRotatef2(yRot - player->yRot, 0, 1, 0);
-            glRotatef2(xRot - player->xRot, 1, 0, 0);
+			// The translated camera is oriented below, after interpolation.
+			// These extra rotations double-invert the front mode.
+			glTranslatef2(0, 0, (float) -cameraDist);
         }
     } else {
         glTranslatef2(0, 0, -0.1f);
     }
 
-    if (!mc->options.fixedCamera) {
-        glRotatef2(player->xRotO + (player->xRot - player->xRotO) * a, 1.0f, 0.0f, 0.0f);
-        glRotatef2(player->yRotO + (player->yRot - player->yRotO) * a + 180, 0, 1, 0);
+	if (!mc->options.fixedCamera) {
+		float interpXRot = player->xRotO + (player->xRot - player->xRotO) * a;
+		float interpYRot = player->yRotO + (player->yRot - player->yRotO) * a;
+		if (mc->options.isThirdPersonFront()) {
+			glRotatef2(-interpXRot, 1.0f, 0.0f, 0.0f);
+			glRotatef2(interpYRot, 0, 1, 0);
+		} else {
+			glRotatef2(interpXRot, 1.0f, 0.0f, 0.0f);
+			glRotatef2(interpYRot + 180, 0, 1, 0);
+		}
 		//if (_t_keepPic > 0)
 	}
     glTranslatef2(0, heightOffset, 0);
@@ -722,8 +781,12 @@ void GameRenderer::pick(float a) {
     if (freeform) {
         isPicking = updateFreeformPickDirection(a, pickDirection);
     } else {
-        mc->hitResult = mc->cameraTargetPlayer->pick(range, a);
-        pickDirection = mc->cameraTargetPlayer->getViewVector(a);
+		Vec3 viewDirection = mc->cameraTargetPlayer->getViewVector(a);
+		if (mc->options.isThirdPersonFront())
+			viewDirection = viewDirection * -1.0f;
+		Vec3 from = mc->cameraTargetPlayer->getPos(a);
+		mc->hitResult = mc->level->clip(from, from + viewDirection * range);
+		pickDirection = viewDirection;
     }
 
     Vec3  from = mc->cameraTargetPlayer->getPos(a);

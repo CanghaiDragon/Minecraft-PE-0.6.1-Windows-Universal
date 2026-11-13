@@ -52,7 +52,14 @@ Packet* SignTileEntity::getUpdatePacket() {
 
 void SignTileEntity::setLevelAndPos( Level* level, int x, int y, int z ) {
 	super::setLevelAndPos(level, x, y, z);
-	if(level->getTile(x, y, z) != Tile::sign->id) {
+	// During infinite-world storage loading the chunk may not yet be resident.
+	// Avoid requesting it recursively; LevelChunk performs the local check once
+	// the entity has been attached.
+	if (level == NULL || !level->hasChunk(x >> 4, z >> 4))
+		return;
+
+	const int tileId = level->getTile(x, y, z);
+	if (tileId != Tile::sign->id && tileId != Tile::wallSign->id) {
 		remove = true;
 	}
 }

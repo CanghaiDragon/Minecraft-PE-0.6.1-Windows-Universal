@@ -299,6 +299,8 @@ void SelectWorldScreen::tick()
 			std::string levelId = getUniqueLevelName("world");
 			LevelSettings settings(getEpochTimeS(), GameType::Creative);
 			minecraft->selectLevel(levelId, levelId, settings);
+			if (minecraft->legacyStorageRejected())
+				return;
 			minecraft->hostMultiplayer();
 			minecraft->setScreen(new ProgressScreen());
 			_hasStartedLevel = true;
@@ -347,11 +349,15 @@ void SelectWorldScreen::tick()
 					int worldType = WorldType::Old;
 					if (sv.size() >= 4 && sv[3] == "infinite")
 						worldType = WorldType::Infinite;
+		else if (sv.size() >= 4 && sv[3] == "alpha")
+			worldType = WorldType::Alpha;
 
 					// Start a new level with the given name and seed
 					LevelSettings settings(seed, isCreative? GameType::Creative : GameType::Survival, worldType);
 					LOGI("Creating a level with id '%s', name '%s' and seed '%d'\n", levelId.c_str(), levelName.c_str(), seed);
 					minecraft->selectLevel(levelId, levelName, settings);
+					if (minecraft->legacyStorageRejected())
+						return;
 					minecraft->hostMultiplayer();
 					minecraft->setScreen(new ProgressScreen());
 					_hasStartedLevel = true;
@@ -367,6 +373,8 @@ void SelectWorldScreen::tick()
 
 	if (worldsList->hasPickedLevel) {
 		minecraft->selectLevel(worldsList->pickedLevel.id, worldsList->pickedLevel.name, LevelSettings::None());
+		if (minecraft->legacyStorageRejected())
+			return;
 		minecraft->hostMultiplayer();
 		minecraft->setScreen(new ProgressScreen());
 		_hasStartedLevel = true;

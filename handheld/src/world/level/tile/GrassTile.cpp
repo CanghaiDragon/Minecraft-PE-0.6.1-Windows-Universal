@@ -4,6 +4,7 @@
 #include "../GrassColor.h"
 #include "../LevelSource.h"
 #include "../biome/BiomeSource.h"
+#include "../biome/Biome.h"
 
 GrassTile::GrassTile(int id)
 :	super(id, Material::dirt)
@@ -13,14 +14,28 @@ GrassTile::GrassTile(int id)
 }
 
 int GrassTile::getTexture( LevelSource* level, int x, int y, int z, int face ) {
+	const bool alpha = Tile::useAlphaTextures()
+		|| level->getBiome(x, z) == Biome::alpha
+		|| level->getBiome(x, z) == Biome::winter;
+	const Material* above = level->getMaterial(x, y + 1, z);
+	if (alpha) {
+		if (face == 1) return Tile::ALPHA_GRASS_TOP_TEXTURE;
+		if (face == 0) return Tile::ALPHA_GRASS_BOTTOM_TEXTURE;
+		if (above == Material::topSnow || above == Material::snow) return 4 * 16 + 4;
+		return Tile::ALPHA_GRASS_SIDE_TEXTURE;
+	}
 	if (face == 1) return 0;
 	if (face == 0) return 2;
-	const Material* above = level->getMaterial(x, y + 1, z);
 	if (above == Material::topSnow || above == Material::snow) return 4 * 16 + 4;
 	else return 3;
 }
 
 int GrassTile::getTexture( int face, int data ) {
+	if (Tile::useAlphaTextures()) {
+		if (face == 1) return Tile::ALPHA_GRASS_TOP_TEXTURE;
+		if (face == 0) return Tile::ALPHA_GRASS_BOTTOM_TEXTURE;
+		return Tile::ALPHA_GRASS_SIDE_TEXTURE;
+	}
 	if (face == 1) return 0;
 	if (face == 0) return 2;
 	return 3;
@@ -30,6 +45,11 @@ int GrassTile::getColor( LevelSource* level, int x, int y, int z ) {
 	//level.getBiomeSource().getBiomeBlock(x, z, 1, 1);
 	//float temp = level.getBiomeSource().temperatures[0];
 	//float rain = level.getBiomeSource().downfalls[0];
+
+	const bool alpha = Tile::useAlphaTextures()
+		|| level->getBiome(x, z) == Biome::alpha
+		|| level->getBiome(x, z) == Biome::winter;
+	if (alpha) return 0xffffff;
 
 	// PE 0.6.1 used one fixed grass tint.  Beta uses the original 256x256
 	// grass colour map indexed by the local climate values.

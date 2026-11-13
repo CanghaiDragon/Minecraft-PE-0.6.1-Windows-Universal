@@ -9,6 +9,9 @@
 #include <list>
 #include <unordered_map>
 #include <cstdint>
+#include <cstddef>
+
+#include "../../../raknet/GetTime.h"
 
 //#include "com/mojang/nbt/CompoundTag.h"
 #include "LevelStorage.h"
@@ -17,11 +20,14 @@
 class Player;
 class Dimension;
 class RegionFile;
+class CompoundTag;
 
 
 typedef struct UnsavedLevelChunk
 {
-	int				pos;
+	// The old x + z * CHUNK_CACHE_WIDTH key only works for finite worlds.
+	// Infinite-world chunk coordinates must retain both signed 32-bit axes.
+	int64_t		pos;
 	RakNet::TimeMS	addedToList;
 	LevelChunk*		chunk;
 } UnsavedLevelChunk;
@@ -69,12 +75,13 @@ public:
 	void finishPreload();
 	// @note, loadEntities and saveEntities dont use second parameter
 	void loadEntities(Level* level, LevelChunk* levelChunk);
+	bool loadDeferredEntities(Level* level, int maxEntities);
 	void saveEntities(Level* level, LevelChunk* levelChunk);
 	void saveGame(Level* level);
     void saveAll(Level* level, std::vector<LevelChunk*>& levelChunks);
 
 	virtual void tick();
-	virtual void flush() {}
+	virtual void flush();
 private:
 	// For infinite worlds: get (or create+open) the RegionFile covering chunk (cx,cz).
 	// Returns nullptr on failure.
@@ -92,6 +99,9 @@ private:
 	int loadedStorageVersion;
 	UnsavedChunkList unsavedChunkList;
 	int lastSavedEntitiesTick;
+	std::unordered_map<int64_t, std::vector<CompoundTag*> > pendingChunkEntityTags;
+
+	void clearPendingChunkEntityTags();
 };
 
 #endif /*NET_MINECRAFT_WORLD_LEVEL_STORAGE__ExternalFileLevelStorage_H__*/

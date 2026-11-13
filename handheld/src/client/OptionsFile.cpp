@@ -34,6 +34,10 @@ bool OptionsFile::exists() const {
 	return true;
 }
 
+void OptionsFile::remove() {
+	::remove(settingsPath.c_str());
+}
+
 StringVector OptionsFile::getOptionStrings() {
 	StringVector returnVector;
 	FILE* pFile = fopen(settingsPath.c_str(), "r");

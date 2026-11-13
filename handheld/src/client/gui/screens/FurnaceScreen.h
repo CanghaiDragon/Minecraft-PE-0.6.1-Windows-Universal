@@ -28,9 +28,14 @@ public:
 	void render(int xm, int ym, float a);
 	bool renderGameBehind();
 	void buttonClicked(Button* button);
+	void mouseClicked(int x, int y, int buttonNum);
+	void mouseMoved(int x, int y);
+	void mouseReleased(int x, int y, int buttonNum);
+	void mouseScrolled(int x, int y, int delta);
 
 	// IInventoryPaneCallback
 	bool addItem(const Touch::InventoryPane* pane, int itemId);
+	bool quickMoveItem(const Touch::InventoryPane* pane, int itemId);
 	bool isAllowed( int slot );
 	std::vector<const ItemInstance*> getItems( const Touch::InventoryPane* forPane );
 private:
@@ -48,6 +53,8 @@ private:
 	bool handleAddItem( int slot, const ItemInstance* item );
 	void handleRenderPane(Touch::InventoryPane* pane, Tesselator& t, int xm, int ym, float a);
 	bool canMoveToFurnace(int inventorySlot, const ItemInstance* item);
+	bool canMoveToFurnaceSlot(int slot, const ItemInstance* item);
+	bool quickMoveFurnaceSlot(int slot);
 	ItemList _items;
 
 	std::string currentItemDesc;

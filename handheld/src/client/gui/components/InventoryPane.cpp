@@ -7,6 +7,8 @@
 #include "../../renderer/Textures.h"
 #include "../../../world/item/ItemInstance.h"
 #include "../../../world/entity/player/Inventory.h"
+#include "../../../platform/input/Keyboard.h"
+#include "../../../platform/input/Mouse.h"
 
 namespace Touch {
 
@@ -51,6 +53,22 @@ InventoryPane::~InventoryPane() {
 	delete _clickArea;
 }
 
+void InventoryPane::mouseClicked(float x, float y, int buttonNum) {
+	if (buttonNum == MouseAction::ACTION_LEFT
+		&& Keyboard::isKeyDown(Keyboard::KEY_LSHIFT)
+		&& bboxArea.isInside(x, y)) {
+		GridItem item = getItemForPos(x, y, true);
+		if (item.id >= 0 && item.id < numItems) {
+			screen->quickMoveItem(this, item.id);
+			// Shift-click is an immediate transfer; do not also start the
+			// scrolling/hold-selection state machine for this press.
+			return;
+		}
+	}
+
+	super::mouseClicked(x, y, buttonNum);
+}
+
 void InventoryPane::renderBatch( std::vector<GridItem>& items, float alpha )
 {
 	//fill(bg.x, bg.y, bg.w, bg.h, 0xff333333);
@@ -69,13 +87,16 @@ void InventoryPane::renderBatch( std::vector<GridItem>& items, float alpha )
 
 	Tesselator& t = Tesselator::instance;
 
+	// Keep the inventory cells independent from gui.png.  The latter now also
+	// contains the hand-drawn start-menu skin entry, so its legacy cell region
+	// is no longer safe to use for the backpack.
 	t.beginOverride();
 	t.colorABGR(0xffffffff);
 	for (unsigned int i = 0; i < items.size(); ++i) {
 		GridItem& item = items[i];
 		blit(item.xf, item.yf, 200, 46, (float)itemBbox.w, (float)itemBbox.h, 16, 16);
 	}
-	mc->textures->loadAndBindTexture("gui/gui.png");
+	mc->textures->loadAndBindTexture("gui/inventory_slot.png");
 	t.endOverrideAndDraw();
 
 	GridItem* marked = NULL;

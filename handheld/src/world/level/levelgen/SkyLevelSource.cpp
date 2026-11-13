@@ -254,6 +254,7 @@ LevelChunk* SkyLevelSource::getChunk(int x, int z) {
 	buildSurfaces(x, z, blocks, biomes);
 	if (trace)
 		MCPE_EXIT_TRACE("SkyLevelSource getChunk surfaces complete");
+	caveFeature.apply(this, level, x, z, blocks, LevelChunk::ChunkBlockCount);
 	chunk->recalcHeightmap();
 	if (trace)
 		MCPE_EXIT_TRACE("SkyLevelSource getChunk complete chunk=%p", (void*)chunk);
@@ -311,7 +312,9 @@ void SkyLevelSource::postProcess(ChunkSource* parent, int xt, int zt) {
         placeOre(random, level, xo + random.nextInt(16), zo + random.nextInt(16), random.nextInt(128), Tile::coalOre->id, 16);
     for (int i = 0; i < 20; ++i)
         placeOre(random, level, xo + random.nextInt(16), zo + random.nextInt(16), getOreStartY(random, lowestRockY, 64), Tile::ironOre->id, 8);
-    for (int i = 0; i < 2; ++i)
+	// Match the increased UWP sky-world gold vein count while retaining the
+	// lower height band used for gold.
+	for (int i = 0; i < 20; ++i)
         placeOre(random, level, xo + random.nextInt(16), zo + random.nextInt(16), getOreStartY(random, lowestRockY, 32), Tile::goldOre->id, 8);
     for (int i = 0; i < 8; ++i)
         placeOre(random, level, xo + random.nextInt(16), zo + random.nextInt(16), getOreStartY(random, lowestRockY, 16), Tile::redStoneOre->id, 7);

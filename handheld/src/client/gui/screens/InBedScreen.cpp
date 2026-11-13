@@ -17,7 +17,7 @@ InBedScreen::~InBedScreen() {
 }
 
 void InBedScreen::init() {
-	if (minecraft->useTouchscreen()) {
+	if (!minecraft->options.javaUi) {
 		bWakeUp = new Touch::TButton(1, "Leave Bed");
 	} else {
 		bWakeUp = new Button(1, "Leave Bed");

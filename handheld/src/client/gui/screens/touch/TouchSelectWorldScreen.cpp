@@ -398,6 +398,8 @@ void SelectWorldScreen::tick()
 			//int seed = Util::hashCode("/r/Minecraft");
 			LevelSettings settings(getEpochTimeS(), GameType::Creative);
 			minecraft->selectLevel(levelId, levelId, settings);
+			if (minecraft->legacyStorageRejected())
+				return;
 			minecraft->hostMultiplayer();
 			minecraft->setScreen(new ProgressScreen());
 			_hasStartedLevel = true;
@@ -447,11 +449,15 @@ void SelectWorldScreen::tick()
 					int worldType = WorldType::Old;
 					if (sv.size() >= 4 && sv[3] == "infinite")
 						worldType = WorldType::Infinite;
+		else if (sv.size() >= 4 && sv[3] == "alpha")
+			worldType = WorldType::Alpha;
 
 					// Start a new level with the given name and seed
 					LOGI("Creating a level with id '%s', name '%s' and seed '%d'\n", levelId.c_str(), levelName.c_str(), seed);
 					LevelSettings settings(seed, isCreative? GameType::Creative : GameType::Survival, worldType);
 					minecraft->selectLevel(levelId, levelName, settings);
+					if (minecraft->legacyStorageRejected())
+						return;
 					minecraft->hostMultiplayer();
 					minecraft->setScreen(new ProgressScreen());
 					_hasStartedLevel = true;
@@ -476,6 +482,8 @@ void SelectWorldScreen::tick()
 			_state = _STATE_CREATEWORLD;
 		} else {
 			minecraft->selectLevel(worldsList->pickedLevel.id, worldsList->pickedLevel.name, LevelSettings::None());
+			if (minecraft->legacyStorageRejected())
+				return;
 			minecraft->hostMultiplayer();
 			minecraft->setScreen(new ProgressScreen());
 			_hasStartedLevel = true;
@@ -524,6 +532,21 @@ void SelectWorldScreen::render( int xm, int ym, float a )
 
 	//Performance::watches.get("sws-full").stop();
 	//Performance::watches.printEvery(128);
+}
+
+void SelectWorldScreen::mouseScrolled(int x, int y, int delta)
+{
+	(void)x;
+	(void)y;
+	if (worldsList == NULL || delta == 0)
+		return;
+
+	// PE world selection is a horizontal carousel. Use the same animated
+	// one-step movement as the left/right controls for a desktop wheel.
+	if (delta > 0)
+		worldsList->stepLeft();
+	else
+		worldsList->stepRight();
 }
 
 void SelectWorldScreen::loadLevelSource()

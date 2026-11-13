@@ -15,6 +15,11 @@ namespace WorldType {
 	const int Old      = 0; // finite 256×256 world
 	const int Infinite = 1; // infinite procedural world
 	const int Sky      = 2; // infinite floating-island terrain, normal dimension
+	const int Alpha    = 3;
+
+	inline bool isAlphaWinter(long seed) {
+		return ((unsigned long long)seed & 3ULL) == 0ULL;
+	}
 }
 
 class LevelSettings

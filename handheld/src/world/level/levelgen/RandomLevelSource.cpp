@@ -504,7 +504,10 @@ LevelChunk* RandomLevelSource::getChunk(int xOffs, int zOffs) {
     prepareHeights(xOffs, zOffs, blocks, 0, temperatures);//biomes, temperatures);
     buildSurfaces(xOffs, zOffs, blocks, biomes);
 
-	//caveFeature.apply(this, level, xOffs, zOffs, blocks, LevelChunk::ChunkBlockCount);
+	// Keep finite worlds faithful to the original PE behavior. Infinite worlds
+	// use the large-cave pass added by the UWP generator.
+	if (level->getLevelData()->getWorldType() == WorldType::Infinite)
+		caveFeature.apply(this, level, xOffs, zOffs, blocks, LevelChunk::ChunkBlockCount);
     levelChunk->recalcHeightmap();
 
     return levelChunk;

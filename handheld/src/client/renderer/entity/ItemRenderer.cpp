@@ -178,7 +178,21 @@ void ItemRenderer::renderGuiItem(Font* font, Textures* textures, const ItemInsta
 	if (!Item::items[id])
 		return;
 
-	int i = getAtlasPos(item);
+	const bool alphaCobblestone = Tile::stoneBrick
+		&& id == Tile::stoneBrick->id
+		&& Tile::useAlphaTextures();
+	// These blocks do not have entries in gui_blocks.png.  Force the normal
+	// fallback path so the inventory uses their terrain textures.  Solid
+	// blocks such as snow/ice are rendered as 3D tiles there,
+	// while water and lava use their 2D terrain icons.  When the GUI is being
+	// batched, the fallback would otherwise draw the red missing-icon rectangle
+	// first.
+	const bool specialTileItem = alphaCobblestone
+		|| (Tile::topSnow && id == Tile::topSnow->id)
+		|| (Tile::ice && id == Tile::ice->id)
+		|| (Tile::water && id == Tile::water->id)
+		|| (Tile::lava && id == Tile::lava->id);
+	int i = specialTileItem ? -1 : getAtlasPos(item);
 
 	if (i < 0) {
 		Tesselator& t = Tesselator::instance;
@@ -189,9 +203,11 @@ void ItemRenderer::renderGuiItem(Font* font, Textures* textures, const ItemInsta
 			//							it we're batching for saving the
 			//							buffer, this will fail miserably
 			t.endOverrideAndDraw();
-			glDisable2(GL_TEXTURE_2D);
-			fillRect(t, x, y, w, h, 0xff0000);
-			glEnable2(GL_TEXTURE_2D);
+			if (!specialTileItem) {
+				glDisable2(GL_TEXTURE_2D);
+				fillRect(t, x, y, w, h, 0xff0000);
+				glEnable2(GL_TEXTURE_2D);
+			}
 			renderGuiItemCorrect(font, textures, item, int(x), int(y));
 			t.beginOverride();
 		}

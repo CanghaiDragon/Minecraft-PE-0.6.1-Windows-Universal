@@ -15,6 +15,7 @@
 
 #include "../Facing.h"
 #include "../../util/PerfTimer.h"
+#include "../../platform/time.h"
 
 #include "tile/LiquidTile.h"
 
@@ -43,6 +44,8 @@ Level::Level(LevelStorage* levelStorage, const std::string& levelName, const Lev
 	_addend(1013904223),
 	_maxRecurse(0),
 	_updateLights(true),
+	_lightUpdateBudget(500),
+	_lightUpdateTimeBudget(-1.0f),
 	_pathFinder(NULL),
 	_spawnFriendlies(true),
 	_spawnEnemies(true),
@@ -522,7 +525,7 @@ void Level::validateSpawn() {
 }
 
 int Level::getTopTile(int x, int z) {
-    if (levelData.getWorldType() == WorldType::Sky) {
+    if (levelData.getWorldType() == WorldType::Sky || levelData.getWorldType() == WorldType::Alpha) {
         int y = getTopTileY(x, z);
         return y < 0 ? 0 : getTile(x, y, z);
     }
@@ -534,7 +537,7 @@ int Level::getTopTile(int x, int z) {
 }
 
 int Level::getTopTileY(int x, int z) {
-    if (levelData.getWorldType() == WorldType::Sky) {
+    if (levelData.getWorldType() == WorldType::Sky || levelData.getWorldType() == WorldType::Alpha) {
         for (int y = DEPTH - 1; y >= 0; --y) {
             const Material* material = getMaterial(x, y, z);
             // Snow layers and small plants do not replace the spawn's supporting block.
@@ -1074,7 +1077,7 @@ void Level::addParticle(ParticleType::Id id, float x, float y, float z, float xd
 		_listeners[i]->addParticle(id, x, y, z, xd, yd, zd, data);
 }
 
-bool Level::addEntity(Entity* e) {
+bool Level::addEntity(Entity* e, bool markChunkUnsaved) {
 	Entity* prev = getEntity(e->entityId);
 	if (prev)
 		removeEntity(prev);
@@ -1092,7 +1095,10 @@ bool Level::addEntity(Entity* e) {
 		if (e->isPlayer() && std::find(players.begin(), players.end(), e) == players.end()) {
 			players.push_back( (Player*) e );
 		}
-		getChunk(xc, zc)->addEntity(e);
+		LevelChunk* chunk = getChunk(xc, zc);
+		chunk->addEntity(e);
+		if (markChunkUnsaved && levelData.isInfinite() && !e->isPlayer())
+			chunk->markUnsaved();
 		entities.push_back(e);
 		entityIdLookup[e->entityId] = e;
 		entityAdded(e);
@@ -1460,7 +1466,30 @@ void Level::tickEntities() {
         Entity* e = entities[i];
 
         if (!e->removed) {
+			const int oldEntityChunkX = e->xChunk;
+			const int oldEntityChunkZ = e->zChunk;
             tick(e);
+
+			// Level::tick() already moves the entity between LevelChunks.  Mark
+			// both sides of a cross-chunk move so the old record loses the entity
+			// and the new record receives it on the next save.
+			const int newEntityChunkX = Mth::floor(e->x / 16.0f);
+			const int newEntityChunkZ = Mth::floor(e->z / 16.0f);
+			if (levelData.isInfinite() &&
+				(oldEntityChunkX != newEntityChunkX ||
+				oldEntityChunkZ != newEntityChunkZ)) {
+				if (hasChunk(oldEntityChunkX, oldEntityChunkZ))
+					getChunk(oldEntityChunkX, oldEntityChunkZ)->markUnsaved();
+				if (e->inChunk && hasChunk(newEntityChunkX, newEntityChunkZ))
+					getChunk(newEntityChunkX, newEntityChunkZ)->markUnsaved();
+			}
+
+			// Entity NBT includes mutable state such as motion, fire, health, and
+			// inventories, so keep the containing chunk dirty while it ticks.
+			if (levelData.isInfinite() && !e->isPlayer() && e->inChunk &&
+				hasChunk(e->xChunk, e->zChunk))
+				getChunk(e->xChunk, e->zChunk)->markUnsaved();
+
 			if (e->getEntityTypeId() == MobTypes::Zombie) {
 				zombies.push_back((Zombie*)e);
 				((Zombie*)e)->setUseNewAi(false); // @note: this is set under
@@ -1472,7 +1501,10 @@ void Level::tickEntities() {
             int xc = e->xChunk;
             int zc = e->zChunk;
             if (e->inChunk && hasChunk(xc, zc)) {
-                getChunk(xc, zc)->removeEntity(e);
+				LevelChunk* chunk = getChunk(xc, zc);
+				chunk->removeEntity(e);
+				if (levelData.isInfinite())
+					chunk->markUnsaved();
             }
 			entityIdLookup.erase(e->entityId);
 			entities.erase(entities.begin() + (i--));
@@ -1893,16 +1925,30 @@ int Level::getLightsToUpdate() {
     return _lightUpdates.size();
 }
 
+void Level::forceLightUpdatesAround(int chunkX, int chunkZ) {
+	if (_chunkSource != NULL)
+		_chunkSource->queueLightUpdatesAround(chunkX, chunkZ);
+}
+
 bool Level::updateLights() {
     if (_maxRecurse >= 50) {
         return false;
     }
 	//static int _MaxSize = 0;
     _maxRecurse++;
-    //try {
-        int max = 500;
+	Stopwatch lightBudget;
+	if (_lightUpdateTimeBudget >= 0.0f)
+		lightBudget.start();
+	int max = _lightUpdateBudget;
+	if (max < 1) max = 1;
         while ((int)_lightUpdates.size() > 0) {
             if (--max <= 0)
+			{
+				_maxRecurse--;
+				return true;
+			}
+			if (_lightUpdateTimeBudget >= 0.0f &&
+				lightBudget.stopContinue() >= _lightUpdateTimeBudget)
 			{
 				_maxRecurse--;
 				return true;
@@ -1923,6 +1969,14 @@ bool Level::updateLights() {
     //}
 }
 
+void Level::setLightUpdateBudget(int budget) {
+	_lightUpdateBudget = budget < 1 ? 1 : budget;
+}
+
+void Level::setLightUpdateTimeBudget(float seconds) {
+	_lightUpdateTimeBudget = seconds;
+}
+
 void Level::setUpdateLights(bool doUpdate) {
 	_updateLights = doUpdate;
 }
@@ -1939,6 +1993,10 @@ void Level::updateLight(const LightLayer& layer, int x0, int y0, int z0, int x1,
     maxLoop++;
 	//if (x0 < -5 || z0 < -5) LOGI("x, z: %d, %d\n", x0, z0);
     if (maxLoop == 50) {
+        // Keep the update instead of silently dropping it when recursive
+        // propagation reaches the safety limit.  The normal light-update
+        // queue will process it after the current propagation unwinds.
+        _lightUpdates.push_back(LightUpdate(layer, x0, y0, z0, x1, y1, z1));
         maxLoop--;
         return;
     }

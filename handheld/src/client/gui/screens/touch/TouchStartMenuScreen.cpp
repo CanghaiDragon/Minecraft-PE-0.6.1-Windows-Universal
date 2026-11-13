@@ -57,7 +57,8 @@ BuyButton::BuyButton(int id)
 
 void BuyButton::render(Minecraft* minecraft, int xm, int ym) {
 	glColor4f2(1, 1, 1, 1);
-	bool hovered = active && (minecraft->useTouchscreen()? (xm >= x && ym >= y && xm < x + width && ym < y + height) : false);
+	bool hovered = active &&
+		(xm >= x && ym >= y && xm < x + width && ym < y + height);
 	renderBg(minecraft, xm, ym);
 	TextureId texId = (_imageDef.name.length() > 0)? minecraft->textures->loadAndBindTexture(_imageDef.name) : Textures::InvalidId;
 	if ( Textures::isTextureIdValid(texId) ) {
@@ -107,6 +108,7 @@ StartMenuScreen::StartMenuScreen()
 	bJoin(    3, "Join Game"),
 	bOptions( 4, "Options"),
 	bQuit(    5, ""),
+	bSkin(    8, ""),
 	bBuy(     5),
 	bTest(    9, "Create")
 {
@@ -125,6 +127,17 @@ StartMenuScreen::StartMenuScreen()
 
 	defSrc.y += defSrc.h;
 	bJoin.setImageDef(def, true);
+
+	ImageDef skinImage;
+	skinImage.name = "gui/touchgui.png";
+	skinImage.width = 32;
+	skinImage.height = 24;
+	skinImage.setSrc(IntRectangle(223, 1, 32, 24));
+	skinImage.setSecondImageVertical(true);
+	skinImage.setSecondImageStep(0, 26);
+	bSkin.setImageDef(skinImage, true);
+	bSkin.scaleWhenPressed = false;
+	bSkin.active = true;
 }
 
 StartMenuScreen::~StartMenuScreen()
@@ -144,6 +157,10 @@ void StartMenuScreen::init()
 	bQuit.setImageDef(quitImage, true);
 	bQuit.scaleWhenPressed = false;
 	buttons.push_back(&bQuit);
+	if (minecraft->options.skinMenu) {
+		buttons.push_back(&bSkin);
+		tabButtons.push_back(&bSkin);
+	}
     //buttons.push_back(&bTest);
 
 	tabButtons.push_back(&bHost);
@@ -158,7 +175,7 @@ void StartMenuScreen::init()
 	copyright = "\xffMojang AB";//. Do not distribute!";
 	githubUrl = "https://github.com/CanghaiDragon/Minecraft-PE-0.6.1-Windows-Universal/tree/master";
 	githubLabel = "Visit Github Repository";
-	buildInfo = std::string("Windows Universal v1.0 build ") + getBuildArchitecture();
+	buildInfo = std::string("Windows Universal v1.1 build ") + getBuildArchitecture();
 
 	#ifdef PRE_ANDROID23
 		std::string versionString = Common::getGameVersionString("j");
@@ -203,6 +220,10 @@ void StartMenuScreen::setupPositions() {
 	bOptions.x	= 2*buttonWidth + (int)(3*spacing);
 	bQuit.x = width - bQuit.width;
 	bQuit.y = 0;
+	if (minecraft->options.skinMenu) {
+		bSkin.x = bQuit.x - bSkin.width;
+		bSkin.y = bQuit.y + (bQuit.height - bSkin.height) / 2;
+	}
 	//bBuy.y = bOptions.y - bBuy.h - 6;
 	//bBuy.x = bOptions.x + bOptions.w - bBuy.w;
 
@@ -247,6 +268,10 @@ void StartMenuScreen::buttonClicked(::Button* button) {
 	if (button->id == bOptions.id)
 	{
 		minecraft->setScreen(new OptionsScreen());
+	}
+	if (button->id == bSkin.id)
+	{
+		minecraft->setScreen(new OptionsScreen(true));
 	}
 	if (button == &bQuit)
 	{

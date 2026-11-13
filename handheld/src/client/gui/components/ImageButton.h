@@ -27,7 +27,10 @@ typedef struct ImageDef {
 		x(0),
 		y(0),
 		width(16),
-		height(16)
+		height(16),
+		secondImageVertical(false),
+		secondImageStepX(0),
+		secondImageStepY(0)
 		{}
 
 	std::string name;
@@ -41,12 +44,25 @@ typedef struct ImageDef {
 		src = srcRect;
 		return *this;
 	}
+	ImageDef& setSecondImageVertical(bool vertical) {
+		secondImageVertical = vertical;
+		return *this;
+	}
+	ImageDef& setSecondImageStep(int stepX, int stepY) {
+		secondImageStepX = stepX;
+		secondImageStepY = stepY;
+		return *this;
+	}
 	IntRectangle* getSrc() {
 		return hasSrc? &src : NULL;
 	}
 protected:
 	IntRectangle src;
 	bool hasSrc;
+	public:
+	bool secondImageVertical;
+	int secondImageStepX;
+	int secondImageStepY;
 } ImageDef;
 
 

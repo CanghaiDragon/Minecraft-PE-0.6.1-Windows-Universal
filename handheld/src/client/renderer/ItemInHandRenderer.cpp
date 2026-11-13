@@ -5,6 +5,7 @@
 #include "entity/EntityRenderDispatcher.h"
 #include "entity/EntityRenderer.h"
 #include "entity/MobRenderer.h"
+#include "LevelRenderer.h"
 #include "../Minecraft.h"
 #include "../player/LocalPlayer.h"
 #include "../../world/entity/player/Player.h"
@@ -28,6 +29,7 @@
 ItemInHandRenderer::ItemInHandRenderer( Minecraft* mc )
 :	mc(mc),
 	lastSlot(-1),
+	renderedAlphaTextures(false),
 	height(0),
 	oHeight(0),
 	lastIconRendered(0),
@@ -75,6 +77,15 @@ void ItemInHandRenderer::renderItem(Mob* mob,  ItemInstance* item )
 {
 	//Stopwatch& w = handler.get("item:" + Tile::tiles[item->id]->getDescriptionId());
 	//w.start();
+
+	const bool alphaTextures = Tile::useAlphaTextures();
+	if (alphaTextures != renderedAlphaTextures) {
+		for (int i = 0; i < MaxNumRenderObjects; ++i)
+			renderObjects[i].itemId = -1;
+		renderedAlphaTextures = alphaTextures;
+		lastItemRendered = -1;
+		lastIconRendered = -1;
+	}
 
 	int itemId = item->id;
 	// Ugly hack, but what the heck, I don't have time at the moment
@@ -388,7 +399,9 @@ void ItemInHandRenderer::renderScreenEffect( float a )
 		renderFire(a);
 	}
 
-	if (mc->player->isInWall()) // Inside a tile
+	const bool spectatorVision =
+		mc->levelRenderer != NULL && mc->levelRenderer->isXrayRenderActive();
+	if (!spectatorVision && mc->player->isInWall()) // Inside a tile
 	{
 		int x = Mth::floor(mc->player->x);
 		int y = Mth::floor(mc->player->y);

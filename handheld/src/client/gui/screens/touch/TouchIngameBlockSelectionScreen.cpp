@@ -166,6 +166,17 @@ void IngameBlockSelectionScreen::mouseReleased(int x, int y, int buttonNum) {
 		super::mouseReleased(x, y, buttonNum);
 }
 
+void IngameBlockSelectionScreen::mouseScrolled(int x, int y, int delta)
+{
+	if (!_blockList || delta == 0)
+		return;
+
+	const IntRectangle& rect = _blockList->rect;
+	if (x >= rect.x && x < rect.x + rect.w &&
+		y >= rect.y && y < rect.y + rect.h)
+		_blockList->mouseScrolled(delta);
+}
+
 bool IngameBlockSelectionScreen::addItem(const InventoryPane* pane, int itemId)
 {
 	Inventory* inventory = minecraft->player->inventory;

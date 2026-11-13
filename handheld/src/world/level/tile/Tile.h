@@ -112,6 +112,20 @@ public:
 	static bool betaVisuals;
 	static void setBetaVisuals(bool enabled) { betaVisuals = enabled; }
 	static bool useBetaVisuals() { return betaVisuals; }
+	// Java Beta's translucent ice path is only active when both Beta visuals
+	// and Fancy graphics are enabled. Keep this separate from betaVisuals so
+	// Beta+Fast can retain the original opaque PE ice path.
+	static bool betaFancyGraphics;
+	static void setBetaFancyGraphics(bool enabled) { betaFancyGraphics = enabled; }
+	static bool useBetaFancyGraphics() { return betaFancyGraphics; }
+	static const int ALPHA_GRASS_TOP_TEXTURE = 160;
+	static const int ALPHA_GRASS_BOTTOM_TEXTURE = 161;
+	static const int ALPHA_GRASS_SIDE_TEXTURE = 162;
+	static const int ALPHA_LEAVES_TEXTURE = 163;
+	static const int ALPHA_COBBLESTONE_TEXTURE = 164;
+	static bool alphaTextures;
+	static void setAlphaTextures(bool enabled) { alphaTextures = enabled; }
+	static bool useAlphaTextures() { return alphaTextures; }
     static int lightBlock[NUM_BLOCK_TYPES];
     static bool translucent[NUM_BLOCK_TYPES];
     static int lightEmission[NUM_BLOCK_TYPES];

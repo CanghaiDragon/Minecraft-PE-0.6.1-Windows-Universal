@@ -40,6 +40,19 @@ public:
 		}
 	}
 };
+
+class RestoreDefaultsButton : public Touch::TButton {
+public:
+	RestoreDefaultsButton() : Touch::TButton(0, "Apply") {}
+	virtual void mouseClicked(Minecraft* minecraft, int x, int y, int buttonNum) {
+		if (buttonNum == MouseAction::ACTION_LEFT && clicked(minecraft, x, y)) {
+			if (minecraft != NULL)
+				minecraft->requestOptionsReset();
+			if (minecraft != NULL && minecraft->soundEngine != NULL)
+				minecraft->soundEngine->playUI("random.click", 1, 1);
+		}
+	}
+};
 }
 
 OptionsGroup::OptionsGroup( std::string labelID )  {
@@ -101,6 +114,16 @@ OptionsGroup& OptionsGroup::addDisabledItem(const std::string& itemLabel, const 
 
 OptionsGroup& OptionsGroup::addDescription(const std::string& text) {
 	addChild(new OptionsDescription(text));
+	setupPositions();
+	return *this;
+}
+
+OptionsGroup& OptionsGroup::addRestoreDefaultsItem(Minecraft* minecraft) {
+	(void)minecraft;
+	RestoreDefaultsButton* element = new RestoreDefaultsButton();
+	element->width = 70;
+	element->height = 20;
+	addChild(new OptionsItem("Restore Default Settings", element));
 	setupPositions();
 	return *this;
 }
@@ -177,6 +200,10 @@ void OptionsGroup::createStepSlider( const Options::Option* option, Minecraft* m
 	} else if (option == &Options::Option::INPUT_MODE) {
 		steps.push_back(0);
 		steps.push_back(1);
+	} else if (option == &Options::Option::THIRD_PERSON) {
+		steps.push_back(Options::THIRD_PERSON_FIRST);
+		steps.push_back(Options::THIRD_PERSON_BACK);
+		steps.push_back(Options::THIRD_PERSON_FRONT);
 	} else if (option == &Options::Option::SKIN_ARM_TYPE) {
 		steps.push_back(0);
 		steps.push_back(1);
@@ -190,7 +217,7 @@ void OptionsGroup::createStepSlider( const Options::Option* option, Minecraft* m
 	}
 
 	Slider* element = new Slider(minecraft, option, steps);
-	element->width = 120;
+	element->width = (option == &Options::Option::THIRD_PERSON) ? 240 : 120;
 	element->height = 24;
 	std::string itemLabel = I18n::get(option->getCaptionId());
 	OptionsItem* item = new OptionsItem(itemLabel, element);

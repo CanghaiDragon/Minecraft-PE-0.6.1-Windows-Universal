@@ -3,6 +3,8 @@
 
 class OptionStrings {
 public:
+	static const char* Performance_DefaultProfile;
+
     static const char* Audio_Music;
     static const char* Audio_Sound;
 
@@ -28,12 +30,14 @@ public:
 
 	static const char* Game_DifficultyLevel;
     static const char* Game_ThirdPerson;
+	static const char* Game_ThirdPersonMode;
 	static const char* Game_HideGui;
 	static const char* Extra_InfiniteWorlds;
 	static const char* Skin_ArmType;
 	static const char* Skin_Menu;
 	static const char* Touch_Sneak;
 	static const char* Extra_DebugScreen;
+	static const char* Extra_JavaUI;
 };
 
 #endif /*NET_MINECRAFT_CLIENT__OptionsStrings_H__*/
