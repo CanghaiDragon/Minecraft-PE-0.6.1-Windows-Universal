@@ -157,7 +157,7 @@ The world type based on Java Edition Alpha v1.1.2_01. Only the biome "Alpha" or 
 - Chunk-boundary rendering, lighting and spawn-handling improvements for extended worlds.
 - Original finite-world save format retained for compatibility with classic MCPE worlds.
 
-For historical fixes and version-specific changes, see the [Update log](Update_log.md).
+For historical fixes and version-specific changes, see the [Update log](docs/Update_log.md).
 
 ---
 
