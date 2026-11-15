@@ -2,6 +2,7 @@
 #include "../StartMenuScreen.h"
 #include "../ProgressScreen.h"
 #include "../DialogDefinitions.h"
+#include "../../Font.h"
 #include "../../components/ImageButton.h" //weird!
 #include "../../../renderer/Textures.h"
 #include "../../../renderer/Tesselator.h"
@@ -15,8 +16,19 @@
 #include <algorithm>
 #include <set>
 #include "../SimpleChooseLevelScreen.h"
+#include "../../../../platform/input/Keyboard.h"
 
 namespace Touch {
+
+namespace {
+const char* kUwpRepositoryUrl =
+	"https://github.com/CanghaiDragon/Minecraft-PE-0.6.1-UWP";
+const char* kUwpRepositoryLabel = "UWP version: Visit GitHub Repository";
+const char* kPe09ConversionNotice =
+	"Conversion to original PE 0.9+ is not available.";
+const char* kUseUwpConversionNotice =
+	"Please use the UWP version for conversion.";
+}
 
 //
 // World Selection List
@@ -277,7 +289,7 @@ void TouchWorldSelectionList::tweenInited() {
 // Select World Screen
 //
 SelectWorldScreen::SelectWorldScreen()
-:	bDelete (1, ""),
+:	bEdit   (1, "Edit"),
 	bCreate (2, "Create new"),
 	bBack   (3, "Back"),
 	bHeader (0, "Select world"),
@@ -286,16 +298,7 @@ SelectWorldScreen::SelectWorldScreen()
 	_hasStartedLevel(false),
 	_state(_STATE_DEFAULT)
 {
-	bDelete.active = false;
-
-	// Delete button
-	ImageDef def;
-	def.name = "gui/touchgui.png";
-	def.width = 34;
-	def.height = 26;
-
-	def.setSrc(IntRectangle(150, 0, (int)def.width, (int)def.height));
-	bDelete.setImageDef(def, true);
+	bEdit.active = false;
 
 	// Create new, and Back button
 /*
@@ -317,7 +320,7 @@ void SelectWorldScreen::init()
 	loadLevelSource();
 	worldsList->commit();
 
-	buttons.push_back(&bDelete);
+	buttons.push_back(&bEdit);
 	buttons.push_back(&bCreate);
 	buttons.push_back(&bBack);
 	buttons.push_back(&bHeader);
@@ -325,7 +328,7 @@ void SelectWorldScreen::init()
 	_mouseHasBeenUp = !Mouse::getButtonState(MouseAction::ACTION_LEFT);
 
 	tabButtons.push_back(&bWorldView);
-	tabButtons.push_back(&bDelete);
+	tabButtons.push_back(&bEdit);
 	tabButtons.push_back(&bCreate);
 	tabButtons.push_back(&bBack);
 }
@@ -335,10 +338,10 @@ void SelectWorldScreen::setupPositions() {
 	bCreate.y =	0;
 	bBack.y   = 0;
 	bHeader.y = 0;
-	bDelete.y = height - 30;
+	bEdit.y = height - 30;
 
 	// Center buttons
-	bDelete.x   = (width - bDelete.width) / 2;
+	bEdit.x     = (width - bEdit.width) / 2;
 	bCreate.x   = width - bCreate.width;//width / 2					- bCreate.w / 2;
 	bBack.x     = 0;//width / 2 + 4 + bCreate.w - bBack.w / 2;
 	bHeader.x   = bBack.width;
@@ -354,11 +357,11 @@ void SelectWorldScreen::buttonClicked(Button* button)
 			_state = _STATE_CREATEWORLD;
 		}
 	}
-	if (button->id == bDelete.id) {
+	if (button->id == bEdit.id) {
 		if (isIndexValid(worldsList->selectedItem)) {
 			LevelSummary level = worldsList->levels[worldsList->selectedItem];
 			LOGI("level: %s, %s\n", level.id.c_str(), level.name.c_str());
-			minecraft->setScreen( new TouchDeleteWorldScreen(level) );
+			minecraft->setScreen( new TouchEditWorldScreen(level) );
 		}
 	}
 	if (button->id == bBack.id) {
@@ -500,7 +503,7 @@ void SelectWorldScreen::tick()
 		//hasSelection = true;
 	}
 
-	bDelete.active = isIndexValid(worldsList->selectedItem);
+	bEdit.active = isIndexValid(worldsList->selectedItem);
 }
 
 void SelectWorldScreen::render( int xm, int ym, float a )
@@ -607,6 +610,182 @@ void TouchDeleteWorldScreen::postResult( bool isOk )
 		storageSource->deleteLevel(_level.id);
 	}
 	minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+}
+
+TouchEditWorldScreen::TouchEditWorldScreen(const LevelSummary& level)
+:   _level(level),
+	levelNameBox(new TextBox(4, "World name")),
+	bApply(new TButton(5, "Apply")),
+	bDelete(1, "Delete"),
+	bConvert(2, "Convert"),
+	bUpgrade(6, "Upgrade"),
+	bBack(3, "Back"),
+	bHeader(0, "Edit world"),
+	_convertible(false),
+	_finiteUpgradeable(false)
+{
+}
+
+TouchEditWorldScreen::~TouchEditWorldScreen()
+{
+	delete levelNameBox;
+	delete bApply;
+}
+
+void TouchEditWorldScreen::init()
+{
+	LevelStorageSource* storageSource = minecraft->getLevelSource();
+	_convertible = storageSource != NULL &&
+		storageSource->isConvertible(_level.id);
+	_finiteUpgradeable = storageSource != NULL &&
+		storageSource->canConvertFiniteLevelToInfinite(_level.id);
+	levelNameBox->text = _level.name;
+
+	buttons.push_back(&bBack);
+	buttons.push_back(&bHeader);
+	buttons.push_back(bApply);
+	buttons.push_back(&bDelete);
+	if (_convertible)
+		buttons.push_back(&bConvert);
+	if (_finiteUpgradeable)
+		buttons.push_back(&bUpgrade);
+
+	tabButtons.push_back(&bDelete);
+	if (_convertible)
+		tabButtons.push_back(&bConvert);
+	if (_finiteUpgradeable)
+		tabButtons.push_back(&bUpgrade);
+	tabButtons.push_back(bApply);
+	tabButtons.push_back(&bBack);
+	textBoxes.push_back(levelNameBox);
+}
+
+void TouchEditWorldScreen::setupPositions()
+{
+	bBack.x = 0;
+	bBack.y = 0;
+	bHeader.x = bBack.width;
+	bHeader.y = 0;
+	bHeader.width = width - bBack.width;
+	bHeader.height = bBack.height;
+
+	const int buttonWidth = (width / 2) - 16;
+	const int buttonHeight = 36;
+	// Keep Apply at the native touch-button width instead of stretching it
+	// across the remaining half of the name row.
+	const int applyWidth = 66;
+	const int nameRowGap = 8;
+	const int nameRowWidth = buttonWidth + applyWidth + nameRowGap;
+	const int nameRowX = (width - nameRowWidth) / 2;
+	const int nameRowY = bHeader.height + 8;
+	levelNameBox->x = nameRowX;
+	levelNameBox->y = nameRowY;
+	levelNameBox->width = buttonWidth;
+	levelNameBox->height = 22;
+	bApply->x = nameRowX + buttonWidth + nameRowGap;
+	bApply->y = nameRowY;
+	bApply->width = applyWidth;
+	// Match the text box height so the two controls line up as one row.
+	bApply->height = levelNameBox->height;
+
+	bDelete.width = buttonWidth;
+	bDelete.height = buttonHeight;
+	bConvert.width = buttonWidth;
+	bConvert.height = buttonHeight;
+	bUpgrade.width = buttonWidth;
+	bUpgrade.height = buttonHeight;
+	const int actionCount = 1 + (_convertible ? 1 : 0) +
+		(_finiteUpgradeable ? 1 : 0);
+	const int gap = 4;
+	const int totalHeight = actionCount * buttonHeight +
+		(actionCount - 1) * gap;
+	const int actionX = (width - buttonWidth) / 2;
+	int actionTop = height / 2 - totalHeight / 2;
+	const int minimumActionTop = nameRowY + levelNameBox->height + 12;
+	if (actionTop < minimumActionTop)
+		actionTop = minimumActionTop;
+
+	bDelete.x = actionX;
+	bDelete.y = actionTop;
+	int nextActionY = actionTop + buttonHeight + gap;
+	if (_convertible) {
+		bConvert.x = actionX;
+		bConvert.y = nextActionY;
+		nextActionY += buttonHeight + gap;
+	}
+	if (_finiteUpgradeable) {
+		bUpgrade.x = actionX;
+		bUpgrade.y = nextActionY;
+	}
+}
+
+void TouchEditWorldScreen::tick()
+{
+	levelNameBox->tick(minecraft);
+}
+
+void TouchEditWorldScreen::render(int xm, int ym, float a)
+{
+	renderBackground();
+	const int linkY = height - Font::DefaultLineHeight - 4;
+	const int useUwpY = linkY - Font::DefaultLineHeight - 2;
+	drawCenteredString(font, kPe09ConversionNotice, width / 2,
+		useUwpY - Font::DefaultLineHeight - 2, 0xffaaaaaa);
+	drawCenteredString(font, kUseUwpConversionNotice, width / 2, useUwpY,
+		0xffaaaaaa);
+	drawCenteredString(font, kUwpRepositoryLabel, width / 2, linkY,
+		0xffcccccc);
+	super::render(xm, ym, a);
+}
+
+void TouchEditWorldScreen::buttonClicked(Button* button)
+{
+	if (button == &bDelete)
+		minecraft->setScreen(new TouchDeleteWorldScreen(_level));
+	else if (button == &bConvert)
+		minecraft->openLegacyWorldConversionScreen(_level.id);
+	else if (button == &bUpgrade)
+		minecraft->openFiniteWorldUpgradeScreen(_level.id);
+	else if (button == bApply) {
+		std::string newName = Util::stringTrim(levelNameBox->text);
+		if (!newName.empty()) {
+			minecraft->getLevelSource()->renameLevel(_level.id, newName);
+			// renameLevel may also change the folder id; rebuild the list before
+			// the editor can issue another action using the old id.
+			minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+		}
+	}
+	else if (button == &bBack)
+		minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+}
+
+void TouchEditWorldScreen::mouseClicked(int x, int y, int buttonNum)
+{
+	const int linkY = height - Font::DefaultLineHeight - 4;
+	const int linkWidth = font->width(kUwpRepositoryLabel);
+	if (buttonNum == MouseAction::ACTION_LEFT &&
+		x >= (width - linkWidth) / 2 && x < (width + linkWidth) / 2 &&
+		y >= linkY && y < linkY + Font::DefaultLineHeight) {
+		minecraft->platform()->openUrl(kUwpRepositoryUrl);
+		return;
+	}
+	super::mouseClicked(x, y, buttonNum);
+}
+
+bool TouchEditWorldScreen::handleBackEvent(bool isDown)
+{
+	if (!isDown)
+		minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+	return true;
+}
+
+void TouchEditWorldScreen::keyPressed(int eventKey)
+{
+	if (eventKey == Keyboard::KEY_ESCAPE) {
+		minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+		return;
+	}
+	super::keyPressed(eventKey);
 }
 
 };

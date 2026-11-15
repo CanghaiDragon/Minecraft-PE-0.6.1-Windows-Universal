@@ -5,6 +5,7 @@
 #include "../TweenData.h"
 #include "../components/Button.h"
 #include "../components/SmallButton.h"
+#include "../components/TextBox.h"
 #include "../components/RolledSelectionListH.h"
 #include "../../Minecraft.h"
 #include "../../../world/level/storage/LevelStorageSource.h"
@@ -70,6 +71,38 @@ private:
 	LevelSummary _level;
 };
 
+// World editor entry screen. Delete is the only destructive editing action;
+// legacy worlds may also expose conversion.
+class EditWorldScreen: public Screen
+{
+	typedef Screen super;
+public:
+	EditWorldScreen(const LevelSummary& level);
+	virtual ~EditWorldScreen();
+
+	virtual void init();
+	virtual void setupPositions();
+	virtual void tick();
+	virtual void render(int xm, int ym, float a);
+	virtual bool handleBackEvent(bool isDown);
+
+protected:
+	virtual void buttonClicked(Button* button);
+	virtual void mouseClicked(int x, int y, int buttonNum);
+	virtual void keyPressed(int eventKey);
+
+private:
+	LevelSummary _level;
+	TextBox* levelNameBox;
+	Button* bApply;
+	Button* bDelete;
+	Button* bConvert;
+	Button* bUpgrade;
+	Button* bBack;
+	bool _convertible;
+	bool _finiteUpgradeable;
+};
+
 
 //
 // Select world screen
@@ -97,7 +130,7 @@ private:
 	void loadLevelSource();
 	std::string getUniqueLevelName(const std::string& level);
 
-	Button bDelete;
+	Button bEdit;
 	Button bCreate;
 	Button bBack;
 	Button bWorldView;

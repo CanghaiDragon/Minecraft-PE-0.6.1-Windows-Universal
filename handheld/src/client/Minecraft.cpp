@@ -27,6 +27,7 @@ extern void setWin32GuiInputEnabled(bool enabled);
 #include "../world/level/storage/LevelStorageSource.h"
 #include "../world/level/storage/LevelStorage.h"
 #include "../world/level/storage/ExternalFileLevelStorage.h"
+#include "../world/level/storage/ExternalFileLevelStorageSource.h"
 #include "player/input/KeyboardInput.h"
 #ifndef STANDALONE_SERVER
 #include "player/input/touchscreen/TouchInputHolder.h"
@@ -76,6 +77,7 @@ extern void setWin32GuiInputEnabled(bool enabled);
 #ifndef STANDALONE_SERVER
 #include "gui/screens/PrerenderTilesScreen.h"
 #include "renderer/Textures.h"
+#include "renderer/Tesselator.h"
 #include "../world/level/GrassColor.h"
 #include "../world/level/FoliageColor.h"
 #include "gui/screens/DeathScreen.h"
@@ -117,6 +119,7 @@ extern void setWin32GuiInputEnabled(bool enabled);
 #endif
 
 #include <exception>
+#include <cstdio>
 
 #ifndef STANDALONE_SERVER
 class LegacyWorldFormatScreen final : public Screen
@@ -124,34 +127,63 @@ class LegacyWorldFormatScreen final : public Screen
 	typedef Screen super;
 
 public:
-	LegacyWorldFormatScreen()
-		: backButton(NULL)
+	LegacyWorldFormatScreen(const std::string& levelId,
+		bool conversionStarted = false,
+		bool finiteWorldUpgrade = false)
+		: backButton(NULL),
+		  convertButton(NULL),
+		  _levelId(levelId),
+		  _statusMessage(),
+		  _conversionStarted(conversionStarted),
+		  _finiteWorldUpgrade(finiteWorldUpgrade)
 	{
 	}
 
 	~LegacyWorldFormatScreen() override
 	{
 		delete backButton;
+		delete convertButton;
 	}
 
 	void init() override
 	{
 		// Select the native button artwork from the independent UI mode.
 		if (minecraft->options.javaUi)
+		{
 			backButton = new Button(1, "Back");
+			convertButton = new Button(2,
+				_finiteWorldUpgrade ? "Upgrade" : "Convert");
+		}
 		else
+		{
 			backButton = new Touch::TButton(1, "Back");
+			convertButton = new Touch::TButton(2,
+				_finiteWorldUpgrade ? "Upgrade" : "Convert");
+		}
 
 		backButton->width = 128;
 		backButton->height = 24;
+		convertButton->width = 128;
+		convertButton->height = 24;
+		buttons.push_back(convertButton);
 		buttons.push_back(backButton);
+		tabButtons.push_back(convertButton);
 		tabButtons.push_back(backButton);
+		if (_conversionStarted)
+		{
+			convertButton->active = false;
+			backButton->active = false;
+		}
 	}
 
 	void setupPositions() override
 	{
-		backButton->x = (width - backButton->width) / 2;
-		backButton->y = height / 2 + 24;
+		const int gap = 8;
+		const int totalWidth = convertButton->width + gap + backButton->width;
+		const int left = (width - totalWidth) / 2;
+		convertButton->x = left;
+		backButton->x = left + convertButton->width + gap;
+		convertButton->y = backButton->y = height / 2 + 24;
 	}
 
 	void render(int xm, int ym, float a) override
@@ -159,24 +191,118 @@ public:
 		// This screen is shown before a Level is attached.  Use the native dirt
 		// background and MC font, as the UWP error screen does.
 		renderDirtBackground(0);
-		drawCenteredString(font,
-			"This world is in an unsupported legacy format.",
-			width / 2, height / 2 - 42, 0xffffff);
-		drawCenteredString(font,
-			"Convert this world before opening it.",
-			width / 2, height / 2 - 26, 0xffffff);
+		if (_conversionStarted)
+		{
+			drawCenteredString(font,
+				_finiteWorldUpgrade ? "Upgrading finite world..." :
+				"Converting world...",
+				width / 2, height / 2 - 42, 0xffffff);
+			drawCenteredString(font,
+				_finiteWorldUpgrade ?
+				"The original world will not be changed." :
+				"Ordinary entities will not be migrated.",
+				width / 2, height / 2 - 26, 0xffffff);
+
+			const int progress = minecraft->getLegacyWorldConversionProgress();
+			char progressText[32];
+			sprintf(progressText, "%d%%", progress);
+			drawCenteredString(font, progressText,
+				width / 2, height / 2 - 10, 0xffffff);
+
+			const int barWidth = 200;
+			const int barHeight = 4;
+			const int barX = width / 2 - barWidth / 2;
+			const int barY = height / 2 + 12;
+			const int filledWidth = barWidth * progress / 100;
+			glDisable2(GL_TEXTURE_2D);
+			Tesselator& t = Tesselator::instance;
+			t.begin();
+			t.color(0x808080);
+			t.vertex((float)barX, (float)barY, 0);
+			t.vertex((float)barX, (float)(barY + barHeight), 0);
+			t.vertex((float)(barX + barWidth), (float)(barY + barHeight), 0);
+			t.vertex((float)(barX + barWidth), (float)barY, 0);
+			t.color(0x80ff80);
+			t.vertex((float)barX, (float)barY, 0);
+			t.vertex((float)barX, (float)(barY + barHeight), 0);
+			t.vertex((float)(barX + filledWidth),
+				(float)(barY + barHeight), 0);
+			t.vertex((float)(barX + filledWidth), (float)barY, 0);
+			t.draw();
+			glEnable2(GL_TEXTURE_2D);
+		}
+		else
+		{
+			drawCenteredString(font,
+				_finiteWorldUpgrade ?
+				"Create a new Infinite copy of this finite world." :
+				"This world is in an unsupported legacy format.",
+				width / 2, height / 2 - 42, 0xffffff);
+			drawCenteredString(font,
+				_finiteWorldUpgrade ?
+				"Existing chunks stay in place; new chunks can generate outside." :
+				"Convert it to a new copy before opening it.",
+				width / 2, height / 2 - 26, 0xffffff);
+		}
+		if (!_statusMessage.empty())
+			drawCenteredString(font, _statusMessage.c_str(),
+				width / 2, height / 2 - 10, 0xffffff);
 		super::render(xm, ym, a);
 	}
 
 	void buttonClicked(Button* button) override
 	{
 		if (button == backButton)
+		{
+			if (!_conversionStarted)
+				minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+		}
+		else if (button == convertButton)
+		{
+			const bool started = _finiteWorldUpgrade ?
+				minecraft->startFiniteWorldUpgrade(_levelId) :
+				minecraft->startLegacyWorldConversion(_levelId);
+			if (started)
+			{
+				_conversionStarted = true;
+				convertButton->active = false;
+				backButton->active = false;
+			}
+			else
+			{
+				_statusMessage = "A conversion is already in progress.";
+			}
+		}
+	}
+
+	void tick() override
+	{
+		if (!_conversionStarted ||
+			!minecraft->isLegacyWorldConversionFinished())
+			return;
+
+		const bool succeeded = minecraft->legacyWorldConversionSucceeded();
+		minecraft->finishLegacyWorldConversion();
+		_conversionStarted = false;
+		if (succeeded)
+		{
+			// The converter creates a separate world directory. Return to the
+			// world list so the newly created copy can be selected normally.
 			minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+		}
+		else
+		{
+			_statusMessage = _finiteWorldUpgrade ?
+				"Upgrade failed. The original world was not changed." :
+				"Conversion failed. The original world was not changed.";
+			convertButton->active = true;
+			backButton->active = true;
+		}
 	}
 
 	bool handleBackEvent(bool isDown) override
 	{
-		if (!isDown)
+		if (!isDown && !_conversionStarted)
 			minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
 		return true;
 	}
@@ -191,7 +317,8 @@ protected:
 	{
 		if (eventKey == Keyboard::KEY_ESCAPE)
 		{
-			minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+			if (!_conversionStarted)
+				minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
 			return;
 		}
 		super::keyPressed(eventKey);
@@ -199,6 +326,11 @@ protected:
 
 private:
 	Button* backButton;
+	Button* convertButton;
+	std::string _levelId;
+	std::string _statusMessage;
+	bool _conversionStarted;
+	bool _finiteWorldUpgrade;
 };
 #endif
 
@@ -253,6 +385,11 @@ Minecraft::Minecraft()
 	pause(false),
 	_running(false),
 	_legacyStorageRejected(false),
+	_legacyConversionRunning(false),
+	_legacyConversionFinished(false),
+	_legacyConversionSucceeded(false),
+	_legacyConversionProgress(0),
+	_finiteWorldUpgrade(false),
 	_optionsResetRequested(false),
 	_pendingLeaveGame(false),
 	_pendingLeaveGameRename(false),
@@ -276,6 +413,7 @@ Minecraft::Minecraft()
 	isGeneratingLevel(false),
 	_hasSignaledGeneratingLevelFinished(true),
 	generateLevelThread(NULL),
+	legacyWorldConversionThread(NULL),
 	progressStagePercentage(0),
 	progressStageStatusId(0),
 	isLookingForMultiplayer(false),
@@ -363,6 +501,10 @@ Minecraft::~Minecraft()
 	delete user;
 	MCPE_EXIT_TRACE("Minecraft destructor: delete inputHolder");
 	delete inputHolder;
+	if (legacyWorldConversionThread != NULL) {
+		delete legacyWorldConversionThread;
+		legacyWorldConversionThread = NULL;
+	}
 
 	MCPE_EXIT_TRACE("Minecraft destructor: delete storageSource");
 	delete storageSource;
@@ -377,6 +519,98 @@ Minecraft::~Minecraft()
 	EntityRenderDispatcher::destroy();
 #endif
 	MCPE_EXIT_TRACE("Minecraft destructor: complete");
+}
+
+void* Minecraft::legacyWorldConversion_tspawn(void* p_param)
+{
+	Minecraft* minecraft = static_cast<Minecraft*>(p_param);
+	ExternalFileLevelStorageSource* source =
+		dynamic_cast<ExternalFileLevelStorageSource*>(minecraft->storageSource);
+	bool success = false;
+	if (source != NULL) {
+		if (minecraft->_finiteWorldUpgrade)
+			success = source->convertFiniteLevelToInfiniteWithProgress(
+				minecraft->_legacyConversionLevelId,
+				&minecraft->_legacyConversionProgress);
+		else
+			success = source->convertLevelWithProgress(
+				minecraft->_legacyConversionLevelId,
+				&minecraft->_legacyConversionProgress);
+	}
+
+	minecraft->_legacyConversionSucceeded = success;
+	minecraft->_legacyConversionFinished = true;
+	minecraft->_legacyConversionRunning = false;
+	return NULL;
+}
+
+bool Minecraft::startLegacyWorldConversion(const std::string& levelId)
+{
+	if (_legacyConversionRunning)
+		return false;
+
+	if (legacyWorldConversionThread != NULL) {
+		delete legacyWorldConversionThread;
+		legacyWorldConversionThread = NULL;
+	}
+
+	_legacyConversionLevelId = levelId;
+	_legacyConversionProgress = 0;
+	_legacyConversionSucceeded = false;
+	_legacyConversionFinished = false;
+	_finiteWorldUpgrade = false;
+	_legacyConversionRunning = true;
+	legacyWorldConversionThread = new CThread(
+		Minecraft::legacyWorldConversion_tspawn, this);
+	return true;
+}
+
+bool Minecraft::startFiniteWorldUpgrade(const std::string& levelId)
+{
+	if (_legacyConversionRunning)
+		return false;
+
+	if (legacyWorldConversionThread != NULL) {
+		delete legacyWorldConversionThread;
+		legacyWorldConversionThread = NULL;
+	}
+
+	_legacyConversionLevelId = levelId;
+	_legacyConversionProgress = 0;
+	_legacyConversionSucceeded = false;
+	_legacyConversionFinished = false;
+	_finiteWorldUpgrade = true;
+	_legacyConversionRunning = true;
+	legacyWorldConversionThread = new CThread(
+		Minecraft::legacyWorldConversion_tspawn, this);
+	return true;
+}
+
+#ifndef STANDALONE_SERVER
+bool Minecraft::openLegacyWorldConversionScreen(const std::string& levelId)
+{
+	if (!startLegacyWorldConversion(levelId))
+		return false;
+
+	setScreen(new LegacyWorldFormatScreen(levelId, true));
+	return true;
+}
+
+bool Minecraft::openFiniteWorldUpgradeScreen(const std::string& levelId)
+{
+	setScreen(new LegacyWorldFormatScreen(levelId, false, true));
+	return true;
+}
+#endif
+
+void Minecraft::finishLegacyWorldConversion()
+{
+	if (legacyWorldConversionThread != NULL) {
+		delete legacyWorldConversionThread;
+		legacyWorldConversionThread = NULL;
+	}
+	_legacyConversionRunning = false;
+	_finiteWorldUpgrade = false;
 }
 
 // Only called by server
@@ -415,7 +649,7 @@ void Minecraft::selectLevel( const std::string& levelId, const std::string& leve
 		_running = false;
 #ifndef STANDALONE_SERVER
 		Keyboard::reset();
-		setScreen(new LegacyWorldFormatScreen());
+		setScreen(new LegacyWorldFormatScreen(levelId));
 #endif
 	}
 }
@@ -845,6 +1079,10 @@ public:
 void Minecraft::tickInput() {
 #ifndef STANDALONE_SERVER
 	InputRAII raiiInput;
+	// Spectator flight is an opt-in debug feature. If the debug option is
+	// disabled while flight is active, clear the no-physics state immediately.
+	if (!options.debugScreenEnabled && options.isFlying)
+		setSpectatorMode(false);
 
 	if (screen && !screen->passEvents) {
 		screenMutex = true;
@@ -974,12 +1212,11 @@ void Minecraft::tickInput() {
 					options.cycleThirdPersonView();
 				}
 
-				// Keep the old no-physics flight shortcut available only in
-				// creative mode.  setIsCreativeMode() clears it when switching
-				// back to survival.
-				if (key == Keyboard::KEY_F && isCreativeMode()) {
-					options.isFlying = !options.isFlying;
-					player->noPhysics = options.isFlying;
+				// Keep the old F-key shortcut available only in creative mode and
+				// when the debug functions option is enabled.
+				if (key == Keyboard::KEY_F && isCreativeMode() &&
+					options.debugScreenEnabled) {
+					setSpectatorMode(!isSpectatorMode());
 				}
 
 				// Q is the drop-item shortcut; keyboard crafting is bound to R.
@@ -1864,6 +2101,22 @@ void Minecraft::setIsCreativeMode(bool isCreative)
 
 bool Minecraft::isCreativeMode() {
 	return _isCreativeMode;
+}
+
+bool Minecraft::isSpectatorMode() const
+{
+	return options.debugScreenEnabled && options.isFlying &&
+		player != NULL && player->noPhysics;
+}
+
+void Minecraft::setSpectatorMode(bool enabled)
+{
+	if (!enabled || !isCreativeMode() || !options.debugScreenEnabled)
+		enabled = false;
+
+	options.isFlying = enabled;
+	if (player != NULL)
+		player->noPhysics = enabled;
 }
 
 bool Minecraft::isKindleFire(int kindleVersion) {

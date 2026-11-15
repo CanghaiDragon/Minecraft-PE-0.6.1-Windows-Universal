@@ -2,6 +2,7 @@
 #include "StartMenuScreen.h"
 #include "ProgressScreen.h"
 #include "DialogDefinitions.h"
+#include "../Font.h"
 #include "../../renderer/Tesselator.h"
 #include "../../../AppPlatform.h"
 #include "../../../util/StringUtils.h"
@@ -14,9 +15,20 @@
 #include <set>
 #include "../../renderer/Textures.h"
 #include "SimpleChooseLevelScreen.h"
+#include "../../../platform/input/Keyboard.h"
 
 static float Max(float a, float b) {
 	return a>b? a : b;
+}
+
+namespace {
+const char* kUwpRepositoryUrl =
+	"https://github.com/CanghaiDragon/Minecraft-PE-0.6.1-UWP";
+const char* kUwpRepositoryLabel = "UWP version: Visit GitHub Repository";
+const char* kPe09ConversionNotice =
+	"Conversion to original PE 0.9+ is not available.";
+const char* kUseUwpConversionNotice =
+	"Please use the UWP version for conversion.";
 }
 
 //
@@ -225,7 +237,7 @@ void WorldSelectionList::tweenInited() {
 // Select World Screen
 //
 SelectWorldScreen::SelectWorldScreen()
-:	bDelete (1, "Delete"),
+:	bEdit   (1, "Edit"),
 	bCreate (2, "Create new"),
 	bBack   (3, "Back"),
 	bWorldView(4, ""),
@@ -233,7 +245,7 @@ SelectWorldScreen::SelectWorldScreen()
 	_state(_STATE_DEFAULT),
 	_hasStartedLevel(false)
 {
-	bDelete.active = false;
+	bEdit.active = false;
 }
 
 SelectWorldScreen::~SelectWorldScreen()
@@ -256,11 +268,11 @@ void SelectWorldScreen::buttonClicked(Button* button)
 			_state = _STATE_CREATEWORLD;
 		}
 	}
-	if (button->id == bDelete.id) {
+	if (button->id == bEdit.id) {
 		if (isIndexValid(worldsList->selectedItem)) {
 			LevelSummary level = worldsList->levels[worldsList->selectedItem];
 			LOGI("level: %s, %s\n", level.id.c_str(), level.name.c_str());
-			minecraft->setScreen( new DeleteWorldScreen(level) );
+			minecraft->setScreen( new EditWorldScreen(level) );
 		}
 	}
 	if (button->id == bBack.id) {
@@ -390,7 +402,7 @@ void SelectWorldScreen::tick()
 		//hasSelection = true;
 	}
 
-	bDelete.active = isIndexValid(worldsList->selectedItem);
+	bEdit.active = isIndexValid(worldsList->selectedItem);
 }
 
 void SelectWorldScreen::init()
@@ -399,14 +411,14 @@ void SelectWorldScreen::init()
 	loadLevelSource();
 	worldsList->commit();
 
-	buttons.push_back(&bDelete);
+	buttons.push_back(&bEdit);
 	buttons.push_back(&bCreate);
 	buttons.push_back(&bBack);
 
 	_mouseHasBeenUp = !Mouse::getButtonState(MouseAction::ACTION_LEFT);
 
 	tabButtons.push_back(&bWorldView);
-	tabButtons.push_back(&bDelete);
+	tabButtons.push_back(&bEdit);
 	tabButtons.push_back(&bCreate);
 	tabButtons.push_back(&bBack);
 }
@@ -433,14 +445,14 @@ void SelectWorldScreen::setupPositions() {
 	//#ifdef ANDROID
 	bCreate.y =	yBase;
 	bBack.y   = yBase;
-	bDelete.y = yBase;
+	bEdit.y = yBase;
 
-	bBack.width = bDelete.width = bCreate.width = 84;
-	//bDelete.h = bCreate.h = bBack.h = 24;
+	bBack.width = bEdit.width = bCreate.width = 84;
+	//bEdit.h = bCreate.h = bBack.h = 24;
 	//#endif
 
 	// Center buttons
-	bDelete.x   = width / 2 - 4 - bDelete.width - bDelete.width / 2;
+	bEdit.x   = width / 2 - 4 - bEdit.width - bEdit.width / 2;
 	bCreate.x   = width / 2					- bCreate.width / 2;
 	bBack.x     = width / 2 + 4 + bCreate.width - bBack.width / 2;
 }
@@ -533,4 +545,192 @@ void DeleteWorldScreen::postResult( bool isOk )
 		storageSource->deleteLevel(_level.id);
 	}
 	minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+}
+
+EditWorldScreen::EditWorldScreen(const LevelSummary& level)
+:   _level(level),
+	levelNameBox(NULL),
+	bApply(NULL),
+	bDelete(NULL),
+	bConvert(NULL),
+	bUpgrade(NULL),
+	bBack(NULL),
+	_convertible(false),
+	_finiteUpgradeable(false)
+{
+}
+
+EditWorldScreen::~EditWorldScreen()
+{
+	delete levelNameBox;
+	delete bApply;
+	delete bDelete;
+	delete bConvert;
+	delete bUpgrade;
+	delete bBack;
+}
+
+void EditWorldScreen::init()
+{
+	LevelStorageSource* storageSource = minecraft->getLevelSource();
+	_convertible = storageSource != NULL &&
+		storageSource->isConvertible(_level.id);
+	_finiteUpgradeable = storageSource != NULL &&
+		storageSource->canConvertFiniteLevelToInfinite(_level.id);
+
+	levelNameBox = new TextBox(4, "World name");
+	levelNameBox->text = _level.name;
+	bApply = new Button(5, "Apply");
+	bDelete = new Button(1, "Delete");
+	bBack = new Button(3, "Back");
+	buttons.push_back(bDelete);
+	if (_convertible) {
+		bConvert = new Button(2, "Convert");
+		buttons.push_back(bConvert);
+	}
+	if (_finiteUpgradeable) {
+		bUpgrade = new Button(6, "Upgrade");
+		buttons.push_back(bUpgrade);
+	}
+	buttons.push_back(bApply);
+	buttons.push_back(bBack);
+
+	tabButtons.push_back(bDelete);
+	if (bConvert != NULL)
+		tabButtons.push_back(bConvert);
+	if (bUpgrade != NULL)
+		tabButtons.push_back(bUpgrade);
+	tabButtons.push_back(bApply);
+	tabButtons.push_back(bBack);
+	textBoxes.push_back(levelNameBox);
+}
+
+void EditWorldScreen::setupPositions()
+{
+	// Keep the editor action buttons the same width as the New World buttons.
+	const int buttonWidth = (width / 2) - 16;
+	const int buttonHeight = 22;
+	const int applyWidth = 100;
+	const int gap = 4;
+	const int nameRowGap = 8;
+	const int nameRowWidth = buttonWidth + applyWidth + nameRowGap;
+	const int nameRowX = (width - nameRowWidth) / 2;
+	const int nameRowY = 34;
+
+	levelNameBox->x = nameRowX;
+	levelNameBox->y = nameRowY;
+	levelNameBox->width = buttonWidth;
+	levelNameBox->height = buttonHeight;
+	bApply->width = applyWidth;
+	bApply->height = buttonHeight;
+	bApply->x = nameRowX + buttonWidth + nameRowGap;
+	bApply->y = nameRowY;
+
+	const int actionCount = 1 + (_convertible ? 1 : 0) +
+		(_finiteUpgradeable ? 1 : 0);
+	const int totalHeight = actionCount * buttonHeight +
+		(actionCount - 1) * gap;
+	const int actionX = (width - buttonWidth) / 2;
+	int actionTop = height / 2 - totalHeight / 2;
+	const int minimumActionTop = nameRowY + buttonHeight + 12;
+	if (actionTop < minimumActionTop)
+		actionTop = minimumActionTop;
+
+	bDelete->width = buttonWidth;
+	bDelete->height = buttonHeight;
+	bDelete->x = actionX;
+	bDelete->y = actionTop;
+
+	int nextActionY = actionTop + buttonHeight + gap;
+	if (bConvert != NULL) {
+		bConvert->width = buttonWidth;
+		bConvert->height = buttonHeight;
+		bConvert->x = actionX;
+		bConvert->y = nextActionY;
+		nextActionY += buttonHeight + gap;
+	}
+
+	if (bUpgrade != NULL) {
+		bUpgrade->width = buttonWidth;
+		bUpgrade->height = buttonHeight;
+		bUpgrade->x = actionX;
+		bUpgrade->y = nextActionY;
+	}
+
+	bBack->width = buttonWidth;
+	bBack->height = buttonHeight;
+	bBack->x = actionX;
+	bBack->y = height - buttonHeight - 4;
+}
+
+void EditWorldScreen::tick()
+{
+	levelNameBox->tick(minecraft);
+}
+
+void EditWorldScreen::render(int xm, int ym, float a)
+{
+	renderBackground();
+	drawCenteredString(font, "Edit world", width / 2, 8, 0xffffffff);
+	drawString(font, "World name:", levelNameBox->x,
+		levelNameBox->y - Font::DefaultLineHeight - 2, 0xffcccccc);
+	const int linkY = bBack->y - Font::DefaultLineHeight - 4;
+	const int useUwpY = linkY - Font::DefaultLineHeight - 2;
+	drawCenteredString(font, kPe09ConversionNotice, width / 2,
+		useUwpY - Font::DefaultLineHeight - 2, 0xffaaaaaa);
+	drawCenteredString(font, kUseUwpConversionNotice, width / 2, useUwpY,
+		0xffaaaaaa);
+	drawCenteredString(font, kUwpRepositoryLabel, width / 2, linkY,
+		0xffcccccc);
+	super::render(xm, ym, a);
+}
+
+void EditWorldScreen::buttonClicked(Button* button)
+{
+	if (button == bDelete)
+		minecraft->setScreen(new DeleteWorldScreen(_level));
+	else if (button == bConvert)
+		minecraft->openLegacyWorldConversionScreen(_level.id);
+	else if (button == bUpgrade)
+		minecraft->openFiniteWorldUpgradeScreen(_level.id);
+	else if (button == bApply) {
+		std::string newName = Util::stringTrim(levelNameBox->text);
+		if (!newName.empty()) {
+			minecraft->getLevelSource()->renameLevel(_level.id, newName);
+			// renameLevel may also change the folder id. Rebuild the list so that
+			// subsequent Delete/Convert actions cannot use the old id.
+			minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+		}
+	}
+	else if (button == bBack)
+		minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+}
+
+void EditWorldScreen::mouseClicked(int x, int y, int buttonNum)
+{
+	const int linkY = bBack->y - Font::DefaultLineHeight - 4;
+	const int linkWidth = font->width(kUwpRepositoryLabel);
+	if (buttonNum == MouseAction::ACTION_LEFT &&
+		x >= (width - linkWidth) / 2 && x < (width + linkWidth) / 2 &&
+		y >= linkY && y < linkY + Font::DefaultLineHeight) {
+		minecraft->platform()->openUrl(kUwpRepositoryUrl);
+		return;
+	}
+	super::mouseClicked(x, y, buttonNum);
+}
+
+bool EditWorldScreen::handleBackEvent(bool isDown)
+{
+	if (!isDown)
+		minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+	return true;
+}
+
+void EditWorldScreen::keyPressed(int eventKey)
+{
+	if (eventKey == Keyboard::KEY_ESCAPE) {
+		minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
+		return;
+	}
+	super::keyPressed(eventKey);
 }

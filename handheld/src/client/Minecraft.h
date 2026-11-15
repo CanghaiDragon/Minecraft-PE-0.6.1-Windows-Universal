@@ -74,11 +74,24 @@ public:
 	void toggleDimension(){}
 	bool isCreativeMode();
 	void setIsCreativeMode(bool isCreative);
+	bool isSpectatorMode() const;
+	void setSpectatorMode(bool enabled);
 	void setScreen(Screen*);
 	// Set when the selected Infinite/Sky world is rejected by the storage
 	// marker check.  UI callers use this to avoid replacing the error screen
 	// with the normal level-generation screen.
 	bool legacyStorageRejected() const { return _legacyStorageRejected; }
+	bool startLegacyWorldConversion(const std::string& levelId);
+	bool startFiniteWorldUpgrade(const std::string& levelId);
+#ifndef STANDALONE_SERVER
+	bool openLegacyWorldConversionScreen(const std::string& levelId);
+	bool openFiniteWorldUpgradeScreen(const std::string& levelId);
+#endif
+	bool isLegacyWorldConversionRunning() const { return _legacyConversionRunning; }
+	bool isLegacyWorldConversionFinished() const { return _legacyConversionFinished; }
+	bool legacyWorldConversionSucceeded() const { return _legacyConversionSucceeded; }
+	int getLegacyWorldConversionProgress() const { return _legacyConversionProgress; }
+	void finishLegacyWorldConversion();
 
 	virtual void selectLevel(const std::string& levelId, const std::string& levelName, const LevelSettings& settings);
 	virtual void setLevel(Level* level, const std::string& message = "", LocalPlayer* forceInsertPlayer = NULL);
@@ -140,6 +153,7 @@ protected:
 
 private:
 	static void* prepareLevel_tspawn(void *p_param);
+	static void* legacyWorldConversion_tspawn(void *p_param);
 
 	void handleMouseClick(int button);
 	void handleMouseDown(int button, bool down);
@@ -189,6 +203,7 @@ public:
 	Gui gui;
 #endif
 	CThread* generateLevelThread;
+	CThread* legacyWorldConversionThread;
 	Screen* screen;
 	static int customDebugId;
 
@@ -218,6 +233,12 @@ protected:
 	LevelStorageSource* storageSource;
 	bool _running;
 	bool _legacyStorageRejected;
+	volatile bool _legacyConversionRunning;
+	volatile bool _legacyConversionFinished;
+	volatile bool _legacyConversionSucceeded;
+	volatile int _legacyConversionProgress;
+	bool _finiteWorldUpgrade;
+	std::string _legacyConversionLevelId;
 	bool _optionsResetRequested;
 	bool _pendingLeaveGame;
 	bool _pendingLeaveGameRename;

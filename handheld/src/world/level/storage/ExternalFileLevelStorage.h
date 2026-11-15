@@ -22,6 +22,12 @@ class Dimension;
 class RegionFile;
 class CompoundTag;
 
+// Storage marker helpers are shared by the normal loader and the explicit
+// legacy-world conversion entry point.
+bool hasRecognizedUwpStorageMarker(const std::string& directory);
+bool hasCurrentUwpStorageMarker(const std::string& directory);
+bool writeCurrentUwpStorageMarker(const std::string& directory);
+
 
 typedef struct UnsavedLevelChunk
 {
@@ -60,7 +66,9 @@ public:
 	static bool readLevelData(const std::string& directory, LevelData& dest);
 	static bool readPlayerData(const std::string& filename, LevelData& dest);
 	static bool writeLevelData(const std::string& datFileName, LevelData& dest, const std::vector<Player*>* players);
-	static void saveLevelData(const std::string& directory, LevelData& levelData, std::vector<Player*>* players);
+	static void saveLevelData(const std::string& directory, LevelData& levelData,
+		std::vector<Player*>* players, bool updateStorageVersion = true,
+		bool writeStorageMarker = true);
 
     int savePendingUnsavedChunks(int maxCount);
 

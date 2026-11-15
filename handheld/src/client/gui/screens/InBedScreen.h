@@ -19,6 +19,9 @@ public:
 
 	void buttonClicked(Button* button);
 
+protected:
+	void keyPressed(int eventKey);
+
 private:
 	Button* bWakeUp;
 };

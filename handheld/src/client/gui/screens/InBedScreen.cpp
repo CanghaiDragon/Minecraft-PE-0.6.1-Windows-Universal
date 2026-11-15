@@ -4,6 +4,7 @@
 #include "../../Minecraft.h"
 #include "../../player/LocalPlayer.h"
 #include "../../../platform/time.h"
+#include "../../../platform/input/Keyboard.h"
 
 static const int WAIT_TICKS = 30;
 
@@ -29,7 +30,7 @@ void InBedScreen::init() {
 
 void InBedScreen::setupPositions() {
 	bWakeUp->width = width / 2;
-	bWakeUp->height = int(height * 0.2f);
+	bWakeUp->height = minecraft->options.javaUi ? 24 : int(height * 0.2f);
 	bWakeUp->y = height - int(bWakeUp->height * 1.5);
 	bWakeUp->x = width/2 - bWakeUp->width/2;
 }
@@ -46,4 +47,15 @@ void InBedScreen::buttonClicked( Button* button ) {
 		minecraft->player->stopSleepInBed(true, true, true);
 		minecraft->setScreen(NULL);
 	}
+}
+
+void InBedScreen::keyPressed(int eventKey) {
+	if (eventKey == Keyboard::KEY_ESCAPE) {
+		// ESC has the same meaning as the Leave Bed button on this screen.  Do
+		// not fall through to the normal screen behavior, which only closes the
+		// screen and can leave the player sleeping for the next pause action.
+		minecraft->player->stopSleepInBed(true, true, true);
+		return;
+	}
+	Screen::keyPressed(eventKey);
 }

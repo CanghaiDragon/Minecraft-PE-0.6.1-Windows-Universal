@@ -487,7 +487,8 @@ void LevelRenderer::updateXrayRenderState(Mob* player)
 	// camera head is actually inside an opaque full block.  Merely touching a
 	// block must not enable the effect.
 	if (level != NULL && player != NULL && mc->isCreativeMode()
-		&& mc->options.isFlying && player->noPhysics) {
+		&& mc->options.debugScreenEnabled && mc->options.isFlying &&
+		player->noPhysics) {
 		const int headX = Mth::floor(player->x);
 		const int headY = Mth::floor(player->y + player->getHeadHeight());
 		const int headZ = Mth::floor(player->z);

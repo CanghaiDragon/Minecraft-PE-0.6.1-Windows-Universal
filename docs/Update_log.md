@@ -2,6 +2,28 @@
 
 This changelog covers the Win32 project. It is separate from the UWP changelog.
 
+## 1.1.1
+
+New features:
+
+- A new world edit page, including:
+  
+  - Allow v1.0 saves to be converted to new version's formate and opened.
+  
+  - Old (Finite) world can be converted to infinite world.
+  
+  - World name revision
+  
+  - Function of converting to 0.9+ PE is not included. Please use the UWP version to convert your worlds.
+
+Bug fix:
+
+* Pressing Esc when sleeping can correctly leave bed instead of entering pause interface
+
+Improvements:
+
+- Blocks can be highlight by crosshair.
+
 ## 1.1
 
 New features:

@@ -53,6 +53,9 @@ public:
     virtual void renameLevel(const std::string& levelId, const std::string& newLevelName) = 0;
 
     virtual bool isConvertible(const std::string& levelId) = 0;
+    // Whether a finite world can be copied into the current Infinite storage
+    // format without modifying the original world.
+    virtual bool canConvertFiniteLevelToInfinite(const std::string& levelId) = 0;
     virtual bool requiresConversion(const std::string& levelId) = 0;
     virtual bool convertLevel(const std::string& levelId, ProgressListener* progress) = 0;
 };

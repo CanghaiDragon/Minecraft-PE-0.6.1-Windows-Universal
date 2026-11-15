@@ -27,9 +27,14 @@ public:
     void deleteLevel(const std::string& levelId);
     void renameLevel(const std::string& levelId, const std::string& newLevelName);
 
-    bool isConvertible(const std::string& levelId) { return false; }
-    bool requiresConversion(const std::string& levelId) { return false; }
-    bool convertLevel(const std::string& levelId, ProgressListener* progress) { return false; }
+    bool isConvertible(const std::string& levelId);
+    bool canConvertFiniteLevelToInfinite(const std::string& levelId);
+    bool requiresConversion(const std::string& levelId);
+    bool convertLevel(const std::string& levelId, ProgressListener* progress);
+    bool convertLevelWithProgress(const std::string& levelId,
+        volatile int* progress);
+    bool convertFiniteLevelToInfiniteWithProgress(const std::string& levelId,
+        volatile int* progress);
 private:
 	void addLevelSummaryIfExists(LevelSummaryList& dest, const char* dirName);
 	bool hasTempDirectory() { return _hasTempDirectory; }

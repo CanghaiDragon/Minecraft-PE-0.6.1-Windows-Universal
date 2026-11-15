@@ -231,14 +231,17 @@ void ExternalFileLevelStorage::saveLevelData(LevelData& levelData, std::vector<P
 	ExternalFileLevelStorage::saveLevelData(levelPath, levelData, players);
 }
 
-void ExternalFileLevelStorage::saveLevelData( const std::string& levelPath, LevelData& levelData, std::vector<Player*>* players )
+void ExternalFileLevelStorage::saveLevelData( const std::string& levelPath,
+	LevelData& levelData, std::vector<Player*>* players,
+	bool updateStorageVersion, bool writeStorageMarker )
 {
 	std::string directory = levelPath + "/";
     std::string tmpFile = directory + fnLevelDatNew;
     std::string datFile = directory + fnLevelDat;
     std::string oldFile = directory + fnLevelDatOld;
 
-	levelData.setStorageVersion(SharedConstants::StorageVersion);
+	if (updateStorageVersion)
+		levelData.setStorageVersion(SharedConstants::StorageVersion);
 	if (!writeLevelData(tmpFile, levelData, players))
         return;
 
@@ -261,7 +264,8 @@ void ExternalFileLevelStorage::saveLevelData( const std::string& levelPath, Leve
 
 	// New markers are written only for newly saved Infinite/Sky storage.  Old
 	// finite worlds remain byte-for-byte free of this UWP-only gate.
-	if (levelData.isInfinite() && !writeCurrentUwpStorageMarker(levelPath))
+	if (writeStorageMarker && levelData.isInfinite() &&
+		!writeCurrentUwpStorageMarker(levelPath))
 		LOGE("UWP could not write storage marker at %s\n", levelPath.c_str());
 
     // Remove the temporary save, if the rename didn't do it

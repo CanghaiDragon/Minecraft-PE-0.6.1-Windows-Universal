@@ -46,6 +46,10 @@ public:
         return false;
     }
 
+    bool canConvertFiniteLevelToInfinite(const std::string& levelId) {
+        return false;
+    }
+
     bool requiresConversion(const std::string& levelId) {
         return false;
     }

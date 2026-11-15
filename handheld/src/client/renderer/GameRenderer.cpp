@@ -416,9 +416,10 @@ void GameRenderer::renderLevel(float a) {
 			if (mc->hitResult.isHit() && !cameraEntity->isUnderLiquid(Material::water)) {
 				TIMER_POP_PUSH("select");
 				Player* player = (Player*) cameraEntity;
-				if (mc->useTouchscreen()) {
-					levelRenderer->renderHitSelect(player, mc->hitResult, 0, NULL, a); //player.inventory->getSelected(), a);
-				}
+				// Show the PE block-selection highlight for keyboard/mouse as well
+				// as touch input.  The hit result and renderer path are identical;
+				// only the old input-mode guard was suppressing it on desktop.
+				levelRenderer->renderHitSelect(player, mc->hitResult, 0, NULL, a); //player.inventory->getSelected(), a);
 				levelRenderer->renderHit(player, mc->hitResult, 0, NULL, a);//player->inventory.getSelected(), a);
 			}
 		}

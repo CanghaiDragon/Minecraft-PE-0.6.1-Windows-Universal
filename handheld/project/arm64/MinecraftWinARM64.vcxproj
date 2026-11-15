@@ -1118,4 +1118,10 @@
           DestinationFolder="$(OutDir)data\lang"
           SkipUnchangedFiles="true" />
   </Target>
+  <Target Name="CopySpectatorTextureAsset" AfterTargets="Build">
+    <MakeDir Directories="$(OutDir)data\images\gui" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\data\images\gui\touchgui2.png"
+          DestinationFolder="$(OutDir)data\images\gui"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>

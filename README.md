@@ -75,15 +75,15 @@ The additional features below can be experienced after opening the corresponding
 
 - Touch sneak option
 
-- F3 Debug Screen
+- Debug Function
 
 - Java Edition style UI
 
 ![F3 debug screen](docs/F3.png)
 
-![F3 toggle](docs/F3_enter.png)
+![Debug](docs/debug.png)
 
-<div align="center">F3 Debug Screen</div>
+<div align="center">Debug Function</div>
 
 ### Improvements
 
@@ -108,7 +108,7 @@ The additional features below can be experienced after opening the corresponding
 
 <h2 align="center">World types</h2>
 
-**IMPORTANT**: Infinite, Sky and Alpha world have a level saving format different from both the original MCPE 0.6.1 and later MCPE infinite versions like 0.9. Therefore, these three world types **CANNOT** be converted and opened in any versions of original MCPE at the moment. Future plans include Infinite/Sky world conversion tools for later MCPE versions. Meanwhile, classic finite worlds retain the original MCPE 0.6.1 save format. saves from 0.1-0.8 original PE are supported.
+**IMPORTANT**: Infinite, Sky and Alpha world have a level saving format different from both the original MCPE 0.6.1 and later MCPE infinite versions like 0.9. The UWP build adds the function of convert to PE 0.9+. Please use UWP version to convert your worlds to a original PE format. I **STRONGLY RECOMMEND** first open the converted world in a middle version (1.18 is tested and works well), as directly open it in 1.26 may cause compatibility issues. Meanwhile, classic finite worlds retain the original MCPE 0.6.1 save format. saves from 0.1-0.8 original PE are supported.
 
 ### Old (finite) world
 
@@ -219,8 +219,6 @@ As UWP version with ARM32 support is implemented, this unfinished ARM32 win32 bu
 <h2 align="center">Future plans</h2>
 
 * Chinese localization
-
-* Infinite/Sky world conversion tools for later MCPE versions (Already in Progress!)
 
 * Possible achievement system
 

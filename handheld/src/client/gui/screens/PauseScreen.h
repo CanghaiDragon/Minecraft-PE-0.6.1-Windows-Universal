@@ -53,6 +53,10 @@ private:
 	ImageDef entityButtonOff;
 	ImageDef entityButtonOn;
 	bool entityButtonState;
+	F3ImageButton bSpectatorButton;
+	ImageDef spectatorButtonOff;
+	ImageDef spectatorButtonOn;
+	bool spectatorButtonState;
 };
 
 #endif /*NET_MINECRAFT_CLIENT_GUI__PauseScreen_H__*/
